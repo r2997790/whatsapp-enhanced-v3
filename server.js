@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 // Import modules
 const whatsappModule = require('./modules/whatsapp');
 const bulkModule = require('./modules/bulk-messaging');
+const templatesModule = require('./modules/templates');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,15 @@ app.post('/api/send-message', whatsappModule.sendMessage);
 // Bulk messaging routes
 app.post('/api/bulk-send-manual', bulkModule.handleManualBulk);
 app.post('/api/bulk-send-csv', bulkModule.uploadMiddleware, bulkModule.handleCSVBulk);
+
+// Template routes
+app.get('/api/templates', templatesModule.getTemplates);
+app.get('/api/templates/categories', templatesModule.getCategories);
+app.get('/api/templates/:id', templatesModule.getTemplate);
+app.post('/api/templates', templatesModule.createTemplate);
+app.put('/api/templates/:id', templatesModule.updateTemplate);
+app.delete('/api/templates/:id', templatesModule.deleteTemplate);
+app.post('/api/templates/:id/process', templatesModule.processTemplate);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
