@@ -11,8 +11,9 @@ class WhatsAppEnhanced {
         
         this.debugLog('WhatsApp Enhanced v3 starting...');
         
-        // Initialize template manager
+        // Initialize managers
         this.templateManager = new TemplateManager(this);
+        this.contactManager = new ContactManager(this);
         
         this.initializeSocket();
         this.initializeEventListeners();
@@ -452,7 +453,64 @@ class WhatsAppEnhanced {
             });
         }
 
+        // Contact management - delegate to contact manager
+        const addContactBtn = document.getElementById('add-contact-btn');
+        if (addContactBtn) {
+            addContactBtn.addEventListener('click', () => {
+                this.contactManager.showAddContactModal();
+            });
+        }
+
+        const saveContactBtn = document.getElementById('save-contact-btn');
+        if (saveContactBtn) {
+            saveContactBtn.addEventListener('click', () => {
+                this.contactManager.saveContact();
+            });
+        }
+
+        const importContactsBtn = document.getElementById('import-contacts-btn');
+        if (importContactsBtn) {
+            importContactsBtn.addEventListener('click', () => {
+                this.contactManager.showImportContactsModal();
+            });
+        }
+
+        const importContactsBtnModal = document.getElementById('import-contacts-btn-modal');
+        if (importContactsBtnModal) {
+            importContactsBtnModal.addEventListener('click', () => {
+                this.contactManager.importContacts();
+            });
+        }
+
+        const createGroupBtn = document.getElementById('create-group-btn');
+        if (createGroupBtn) {
+            createGroupBtn.addEventListener('click', () => {
+                this.contactManager.showCreateGroupModal();
+            });
+        }
+
+        const saveGroupBtn = document.getElementById('save-group-btn');
+        if (saveGroupBtn) {
+            saveGroupBtn.addEventListener('click', () => {
+                this.contactManager.saveGroup();
+            });
+        }
+
         // Search and filters
+        const contactSearch = document.getElementById('contact-search');
+        if (contactSearch) {
+            contactSearch.addEventListener('input', (e) => {
+                this.contactManager.searchContacts(e.target.value);
+            });
+        }
+
+        const contactTagFilter = document.getElementById('contact-tag-filter');
+        if (contactTagFilter) {
+            contactTagFilter.addEventListener('change', (e) => {
+                this.contactManager.filterContactsByTag(e.target.value);
+            });
+        }
+
         const categoryFilter = document.getElementById('category-filter');
         if (categoryFilter) {
             categoryFilter.addEventListener('change', (e) => {
@@ -465,8 +523,8 @@ class WhatsAppEnhanced {
             tab.addEventListener('shown.bs.tab', (e) => {
                 const target = e.target.getAttribute('data-bs-target');
                 if (target === '#contacts') {
-                    this.loadContacts();
-                    this.loadGroups();
+                    this.contactManager.loadContacts();
+                    this.contactManager.loadGroups();
                 } else if (target === '#templates') {
                     this.templateManager.loadTemplates();
                 } else if (target === '#personalization') {
@@ -598,9 +656,7 @@ class WhatsAppEnhanced {
         }
     }
 
-    // Stub functions for other functionality
-    loadContacts() { this.debugLog('Load contacts - not implemented yet'); }
-    loadGroups() { this.debugLog('Load groups - not implemented yet'); }
+    // Stub functions for personalization functionality
     loadSuggestedTokens() { this.debugLog('Load suggested tokens - not implemented yet'); }
     loadGroupsForPersonalization() { this.debugLog('Load groups for personalization - not implemented yet'); }
 }
