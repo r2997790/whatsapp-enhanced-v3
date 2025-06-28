@@ -35,6 +35,12 @@
             transform: translateY(-3px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
+        .connection-controls {
+            margin-top: 15px;
+        }
+        .btn-connect {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -52,10 +58,39 @@
                         <div id="status-display">
                             <span class="status-indicator status-disconnected"></span>
                             <span id="status-text">Disconnected</span>
+                            <span id="client-count" class="text-muted ms-2" style="display: none;"></span>
                         </div>
+                        
+                        <!-- Connection Controls -->
+                        <div class="connection-controls">
+                            <button id="connect-btn" class="btn btn-success btn-connect" onclick="app.connectWhatsApp()" title="Connect to WhatsApp">
+                                <i class="bi bi-play-fill"></i> Connect
+                            </button>
+                            <button id="reconnect-btn" class="btn btn-warning btn-connect" onclick="app.reconnectWhatsApp()" style="display: none;" title="Reconnect to WhatsApp">
+                                <i class="bi bi-arrow-clockwise"></i> Reconnect
+                            </button>
+                            <button id="disconnect-btn" class="btn btn-danger btn-connect" onclick="app.disconnectWhatsApp()" style="display: none;" title="Disconnect from WhatsApp">
+                                <i class="bi bi-stop-fill"></i> Disconnect
+                            </button>
+                            <button id="refresh-qr-btn" class="btn btn-info btn-connect" onclick="app.refreshQR()" style="display: none;" title="Refresh QR Code">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh QR
+                            </button>
+                        </div>
+                        
+                        <!-- Loading Status -->
+                        <div id="loading-status" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div id="loading-progress" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <small id="loading-message" class="text-muted">Initializing...</small>
+                        </div>
+                        
                         <div id="qr-container" class="qr-container" style="display: none;">
                             <h6>Scan QR Code with WhatsApp</h6>
                             <img id="qr-image" src="" alt="QR Code" class="img-fluid">
+                            <div class="mt-2">
+                                <small class="text-muted">Open WhatsApp on your phone → Settings → Linked Devices → Link a Device</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -314,6 +349,7 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
