@@ -74,8 +74,12 @@ class WhatsAppEnhanced {
         const statusElement = document.getElementById('websocket-status');
         const statusText = document.getElementById('ws-status-text');
         
-        statusElement.className = `connection-status ${status}`;
-        statusText.textContent = text;
+        if (statusElement) {
+            statusElement.className = `connection-status ${status}`;
+        }
+        if (statusText) {
+            statusText.textContent = text;
+        }
     }
 
     updateStatus(status) {
@@ -100,6 +104,9 @@ class WhatsAppEnhanced {
             clientCount.style.display = 'inline';
         }
         
+        // Update connection buttons based on status
+        this.updateConnectionButtons(status.status);
+        
         // Show/hide QR container
         if (status.status === 'qr_ready') {
             qrContainer.style.display = 'block';
@@ -109,6 +116,39 @@ class WhatsAppEnhanced {
             loadingStatus.style.display = 'none';
         } else {
             loadingStatus.style.display = 'none';
+        }
+    }
+
+    updateConnectionButtons(status) {
+        const connectBtn = document.getElementById('connect-btn');
+        const reconnectBtn = document.getElementById('reconnect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const refreshQrBtn = document.getElementById('refresh-qr-btn');
+        
+        // Hide all buttons first
+        connectBtn.style.display = 'none';
+        reconnectBtn.style.display = 'none';
+        disconnectBtn.style.display = 'none';
+        refreshQrBtn.style.display = 'none';
+        
+        switch (status) {
+            case 'disconnected':
+                connectBtn.style.display = 'inline-block';
+                break;
+            case 'qr_ready':
+                reconnectBtn.style.display = 'inline-block';
+                refreshQrBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'inline-block';
+                break;
+            case 'authenticated':
+            case 'ready':
+                disconnectBtn.style.display = 'inline-block';
+                reconnectBtn.style.display = 'inline-block';
+                break;
+            case 'auth_failure':
+            case 'error':
+                connectBtn.style.display = 'inline-block';
+                break;
         }
     }
 
@@ -143,6 +183,71 @@ class WhatsAppEnhanced {
         progressBar.style.width = `${percent}%`;
         progressBar.textContent = `${percent}%`;
         loadingMessage.textContent = message;
+    }
+
+    // Connection control functions
+    async connectWhatsApp() {
+        try {
+            this.showNotification('info', 'Connecting...', 'Initializing WhatsApp connection');
+            const response = await fetch('/api/whatsapp/connect', { method: 'POST' });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('success', 'Connection Started', result.message);
+            } else {
+                this.showNotification('error', 'Connection Failed', result.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Connection Error', 'Failed to start WhatsApp connection');
+        }
+    }
+
+    async reconnectWhatsApp() {
+        try {
+            this.showNotification('info', 'Reconnecting...', 'Restarting WhatsApp connection');
+            const response = await fetch('/api/whatsapp/reconnect', { method: 'POST' });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('success', 'Reconnection Started', result.message);
+            } else {
+                this.showNotification('error', 'Reconnection Failed', result.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Reconnection Error', 'Failed to reconnect to WhatsApp');
+        }
+    }
+
+    async disconnectWhatsApp() {
+        try {
+            this.showNotification('info', 'Disconnecting...', 'Stopping WhatsApp connection');
+            const response = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('success', 'Disconnected', result.message);
+            } else {
+                this.showNotification('error', 'Disconnection Failed', result.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Disconnection Error', 'Failed to disconnect from WhatsApp');
+        }
+    }
+
+    async refreshQR() {
+        try {
+            this.showNotification('info', 'Refreshing...', 'Generating new QR code');
+            const response = await fetch('/api/whatsapp/refresh-qr', { method: 'POST' });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('success', 'QR Refreshed', result.message);
+            } else {
+                this.showNotification('error', 'Refresh Failed', result.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Refresh Error', 'Failed to refresh QR code');
+        }
     }
 
     showNotification(type, title, message) {
@@ -208,63 +313,99 @@ class WhatsAppEnhanced {
         });
 
         // Contact management
-        document.getElementById('add-contact-btn').addEventListener('click', () => {
-            this.showAddContactModal();
-        });
+        const addContactBtn = document.getElementById('add-contact-btn');
+        if (addContactBtn) {
+            addContactBtn.addEventListener('click', () => {
+                this.showAddContactModal();
+            });
+        }
 
-        document.getElementById('save-contact-btn').addEventListener('click', () => {
-            this.saveContact();
-        });
+        const saveContactBtn = document.getElementById('save-contact-btn');
+        if (saveContactBtn) {
+            saveContactBtn.addEventListener('click', () => {
+                this.saveContact();
+            });
+        }
 
-        document.getElementById('import-contacts-btn').addEventListener('click', () => {
-            this.showImportContactsModal();
-        });
+        const importContactsBtn = document.getElementById('import-contacts-btn');
+        if (importContactsBtn) {
+            importContactsBtn.addEventListener('click', () => {
+                this.showImportContactsModal();
+            });
+        }
 
-        document.getElementById('import-contacts-btn-modal').addEventListener('click', () => {
-            this.importContacts();
-        });
+        const importContactsBtnModal = document.getElementById('import-contacts-btn-modal');
+        if (importContactsBtnModal) {
+            importContactsBtnModal.addEventListener('click', () => {
+                this.importContacts();
+            });
+        }
 
-        document.getElementById('create-group-btn').addEventListener('click', () => {
-            this.showCreateGroupModal();
-        });
+        const createGroupBtn = document.getElementById('create-group-btn');
+        if (createGroupBtn) {
+            createGroupBtn.addEventListener('click', () => {
+                this.showCreateGroupModal();
+            });
+        }
 
-        document.getElementById('save-group-btn').addEventListener('click', () => {
-            this.saveGroup();
-        });
+        const saveGroupBtn = document.getElementById('save-group-btn');
+        if (saveGroupBtn) {
+            saveGroupBtn.addEventListener('click', () => {
+                this.saveGroup();
+            });
+        }
 
         // Search and filters
-        document.getElementById('contact-search').addEventListener('input', (e) => {
-            this.filterContacts(e.target.value);
-        });
+        const contactSearch = document.getElementById('contact-search');
+        if (contactSearch) {
+            contactSearch.addEventListener('input', (e) => {
+                this.filterContacts(e.target.value);
+            });
+        }
 
-        document.getElementById('contact-tag-filter').addEventListener('change', (e) => {
-            this.filterContactsByTag(e.target.value);
-        });
+        const contactTagFilter = document.getElementById('contact-tag-filter');
+        if (contactTagFilter) {
+            contactTagFilter.addEventListener('change', (e) => {
+                this.filterContactsByTag(e.target.value);
+            });
+        }
 
         document.getElementById('category-filter').addEventListener('change', (e) => {
             this.filterTemplatesByCategory(e.target.value);
         });
 
         // Personalization
-        document.getElementById('personalize-message').addEventListener('input', () => {
-            this.updatePersonalizationTokens();
-            this.updatePersonalizationPreview();
-        });
+        const personalizeMessage = document.getElementById('personalize-message');
+        if (personalizeMessage) {
+            personalizeMessage.addEventListener('input', () => {
+                this.updatePersonalizationTokens();
+                this.updatePersonalizationPreview();
+            });
+        }
 
-        document.getElementById('personalize-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.sendPersonalizedMessage();
-        });
+        const personalizeForm = document.getElementById('personalize-form');
+        if (personalizeForm) {
+            personalizeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.sendPersonalizedMessage();
+            });
+        }
 
-        document.getElementById('bulk-personalize-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.sendBulkPersonalized();
-        });
+        const bulkPersonalizeForm = document.getElementById('bulk-personalize-form');
+        if (bulkPersonalizeForm) {
+            bulkPersonalizeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.sendBulkPersonalized();
+            });
+        }
 
-        document.getElementById('group-personalize-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.sendGroupPersonalized();
-        });
+        const groupPersonalizeForm = document.getElementById('group-personalize-form');
+        if (groupPersonalizeForm) {
+            groupPersonalizeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.sendGroupPersonalized();
+            });
+        }
 
         // Tab change listeners
         document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
@@ -365,6 +506,87 @@ class WhatsAppEnhanced {
         `).join('');
     }
 
+    // Bulk messaging functions
+    async sendManualBulk() {
+        const contacts = document.getElementById('bulk-contacts').value;
+        const message = document.getElementById('bulk-message').value;
+        const delay = document.getElementById('bulk-delay').value;
+
+        if (!contacts || !message) {
+            this.showNotification('error', 'Validation Error', 'Contacts and message are required');
+            return;
+        }
+
+        const phoneNumbers = contacts.split('\n').filter(num => num.trim().length > 0);
+        
+        try {
+            const response = await fetch('/api/bulk-send-manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    numbers: phoneNumbers, 
+                    message, 
+                    delay: parseInt(delay) 
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showNotification('success', 'Bulk Send Started', result.message);
+                this.displayBulkResults(result.results);
+            } else {
+                this.showNotification('error', 'Bulk Send Failed', result.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Network Error', 'Failed to send bulk messages');
+        }
+    }
+
+    async sendCSVBulk() {
+        const fileInput = document.getElementById('csv-file');
+        const message = document.getElementById('csv-message').value;
+        const delay = document.getElementById('csv-delay').value;
+
+        if (!fileInput.files[0] || !message) {
+            this.showNotification('error', 'Validation Error', 'CSV file and message are required');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('csvFile', fileInput.files[0]);
+        formData.append('message', message);
+        formData.append('delay', delay);
+
+        try {
+            const response = await fetch('/api/bulk-send-csv', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showNotification('success', 'CSV Bulk Send Started', result.message);
+                this.displayBulkResults(result.results);
+            } else {
+                this.showNotification('error', 'CSV Bulk Send Failed', result.message);
+            }
+        } catch (error) {
+            this.showNotification('error', 'Network Error', 'Failed to send CSV bulk messages');
+        }
+    }
+
+    displayBulkResults(results) {
+        const container = document.getElementById('bulk-results');
+        const summary = document.getElementById('bulk-summary');
+        const details = document.getElementById('bulk-details');
+        
+        if (results) {
+            container.style.display = 'block';
+            summary.innerHTML = `<strong>Total: ${results.length}</strong>`;
+            // Add more detailed results display if needed
+        }
+    }
+
     // Stub functions for the rest of the functionality
     showTemplateModal() { console.log('Template modal'); }
     saveTemplate() { console.log('Save template'); }
@@ -389,8 +611,9 @@ class WhatsAppEnhanced {
     loadGroupsForPersonalization() { console.log('Load groups for personalization'); }
     updateContactTagFilter() { console.log('Update contact tag filter'); }
     updateCategoryFilter() { console.log('Update category filter'); }
-    sendManualBulk() { console.log('Send manual bulk'); }
-    sendCSVBulk() { console.log('Send CSV bulk'); }
+    useTemplate() { console.log('Use template'); }
+    editTemplate() { console.log('Edit template'); }
+    deleteTemplate() { console.log('Delete template'); }
 }
 
 // Initialize the application
