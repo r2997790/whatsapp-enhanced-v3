@@ -12,6 +12,12 @@ class WhatsAppManager {
         this.initializeClient();
     }
 
+    emitToSocket(event, data) {
+        if (global.socketIo) {
+            global.socketIo.emit(event, data);
+        }
+    }
+
     async initializeClient() {
         try {
             this.initializationAttempts++;
@@ -49,6 +55,7 @@ class WhatsAppManager {
         } catch (error) {
             console.error('Error initializing WhatsApp client:', error);
             this.status = 'error';
+            this.emitToSocket('status_update', this.getStatus());
             
             if (this.initializationAttempts < this.maxInitializationAttempts) {
                 console.log('Retrying initialization in 5 seconds...');
@@ -58,6 +65,7 @@ class WhatsAppManager {
             } else {
                 console.error('Max initialization attempts reached. Running in demo mode.');
                 this.status = 'demo_mode';
+                this.emitToSocket('status_update', this.getStatus());
             }
         }
     }
@@ -69,6 +77,10 @@ class WhatsAppManager {
                 this.qrCode = await qrcode.toDataURL(qr);
                 this.status = 'qr_ready';
                 console.log('QR Code generated successfully');
+                
+                // Emit QR code and status to all connected clients
+                this.emitToSocket('qr_code', { qr: this.qrCode });
+                this.emitToSocket('status_update', this.getStatus());
             } catch (error) {
                 console.error('Error generating QR code:', error);
             }
@@ -78,22 +90,53 @@ class WhatsAppManager {
             console.log('WhatsApp Client is ready!');
             this.isReady = true;
             this.status = 'ready';
+            
+            // Emit ready status to all connected clients
+            this.emitToSocket('status_update', this.getStatus());
+            this.emitToSocket('connection_ready', { 
+                message: 'WhatsApp is now connected and ready!',
+                timestamp: new Date().toISOString()
+            });
         });
 
         this.client.on('authenticated', () => {
             console.log('WhatsApp Client authenticated');
             this.status = 'authenticated';
+            
+            // Emit authentication success
+            this.emitToSocket('status_update', this.getStatus());
+            this.emitToSocket('authenticated', { 
+                message: 'WhatsApp authentication successful!',
+                timestamp: new Date().toISOString()
+            });
         });
 
         this.client.on('auth_failure', (msg) => {
             console.error('WhatsApp authentication failed:', msg);
             this.status = 'auth_failure';
+            
+            // Emit authentication failure
+            this.emitToSocket('status_update', this.getStatus());
+            this.emitToSocket('auth_failure', { 
+                message: 'WhatsApp authentication failed. Please scan the QR code again.',
+                error: msg,
+                timestamp: new Date().toISOString()
+            });
         });
 
         this.client.on('disconnected', (reason) => {
             console.log('WhatsApp Client disconnected:', reason);
             this.isReady = false;
             this.status = 'disconnected';
+            this.qrCode = null;
+            
+            // Emit disconnection
+            this.emitToSocket('status_update', this.getStatus());
+            this.emitToSocket('disconnected', { 
+                message: 'WhatsApp disconnected. Attempting to reconnect...',
+                reason: reason,
+                timestamp: new Date().toISOString()
+            });
             
             // Auto-reconnect after 10 seconds
             setTimeout(() => {
@@ -105,6 +148,18 @@ class WhatsAppManager {
         this.client.on('message', (message) => {
             // Log received messages for debugging
             console.log('Message received:', message.from, message.body);
+            
+            // Emit received message to frontend (optional)
+            this.emitToSocket('message_received', {
+                from: message.from,
+                body: message.body,
+                timestamp: message.timestamp
+            });
+        });
+
+        this.client.on('loading_screen', (percent, message) => {
+            console.log('Loading:', percent + '%', message);
+            this.emitToSocket('loading_update', { percent, message });
         });
     }
 
@@ -112,6 +167,15 @@ class WhatsAppManager {
         if (this.status === 'demo_mode') {
             // In demo mode, simulate sending message
             console.log(`[DEMO MODE] Would send message to ${number}: ${message}`);
+            
+            // Emit demo message sent
+            this.emitToSocket('message_sent', {
+                demo: true,
+                number: number,
+                message: message,
+                timestamp: new Date().toISOString()
+            });
+            
             return { success: true, demo: true };
         }
         
@@ -123,9 +187,27 @@ class WhatsAppManager {
             const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
             const result = await this.client.sendMessage(chatId, message);
             console.log(`Message sent successfully to ${number}`);
+            
+            // Emit successful message sent
+            this.emitToSocket('message_sent', {
+                success: true,
+                number: number,
+                message: message,
+                timestamp: new Date().toISOString()
+            });
+            
             return result;
         } catch (error) {
             console.error(`Failed to send message to ${number}:`, error);
+            
+            // Emit message send failure
+            this.emitToSocket('message_send_error', {
+                number: number,
+                message: message,
+                error: error.message,
+                timestamp: new Date().toISOString()
+            });
+            
             throw error;
         }
     }
@@ -138,7 +220,10 @@ class WhatsAppManager {
         return {
             status: this.status,
             isReady: this.isReady,
-            demoMode: this.status === 'demo_mode'
+            demoMode: this.status === 'demo_mode',
+            hasQR: !!this.qrCode,
+            timestamp: new Date().toISOString(),
+            connectedClients: global.socketIo ? global.socketIo.getConnectedClients() : 0
         };
     }
 
