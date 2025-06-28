@@ -1,5 +1,7 @@
 class WhatsAppEnhanced {
     constructor() {
+        this.currentTemplate = null;
+        this.templates = [];
         this.init();
     }
 
@@ -7,6 +9,7 @@ class WhatsAppEnhanced {
         this.setupEventListeners();
         this.checkStatus();
         this.startStatusPolling();
+        this.loadTemplates();
     }
 
     setupEventListeners() {
@@ -25,6 +28,34 @@ class WhatsAppEnhanced {
         document.getElementById('csv-bulk-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.sendCSVBulkMessages();
+        });
+
+        // Template events
+        document.getElementById('create-template-btn').addEventListener('click', () => {
+            this.showTemplateForm();
+        });
+
+        document.getElementById('save-template-btn').addEventListener('click', () => {
+            this.saveTemplate();
+        });
+
+        document.getElementById('send-template-btn').addEventListener('click', () => {
+            this.sendTemplateMessage();
+        });
+
+        // Template content variable detection
+        document.getElementById('template-content').addEventListener('input', (e) => {
+            this.detectVariables(e.target.value);
+        });
+
+        // Category filter
+        document.getElementById('category-filter').addEventListener('change', (e) => {
+            this.filterTemplatesByCategory(e.target.value);
+        });
+
+        // Tab change events
+        document.getElementById('templates-tab').addEventListener('click', () => {
+            this.loadTemplates();
         });
     }
 
@@ -274,6 +305,315 @@ class WhatsAppEnhanced {
         resultsDiv.style.display = 'block';
     }
 
+    // Template Management Functions
+    async loadTemplates() {
+        try {
+            const response = await fetch('/api/templates');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.templates = data.templates;
+                this.displayTemplates(this.templates);
+                this.loadCategories();
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+        }
+    }
+
+    async loadCategories() {
+        try {
+            const response = await fetch('/api/templates/categories');
+            const data = await response.json();
+            
+            if (data.success) {
+                const categorySelect = document.getElementById('category-filter');
+                categorySelect.innerHTML = '<option value="">All Categories</option>';
+                
+                data.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                    categorySelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    displayTemplates(templates) {
+        const templatesContainer = document.getElementById('templates-list');
+        
+        if (templates.length === 0) {
+            templatesContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        No templates found. Create your first template to get started!
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        templatesContainer.innerHTML = templates.map(template => `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card template-card h-100" onclick="app.viewTemplate('${template.id}')">
+                    <div class="card-body">
+                        <h6 class="card-title">${template.name}</h6>
+                        <span class="badge bg-secondary mb-2">${template.category}</span>
+                        <p class="card-text small text-muted">${template.content.substring(0, 100)}${template.content.length > 100 ? '...' : ''}</p>
+                        <div class="small text-muted">
+                            Variables: ${template.variables.map(v => `{{${v}}}`).join(', ') || 'None'}
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-primary me-2" onclick="event.stopPropagation(); app.useTemplate('${template.id}')">Use</button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="event.stopPropagation(); app.editTemplate('${template.id}')">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); app.deleteTemplate('${template.id}')">Delete</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    filterTemplatesByCategory(category) {
+        const filteredTemplates = category ? 
+            this.templates.filter(template => template.category === category) : 
+            this.templates;
+        this.displayTemplates(filteredTemplates);
+    }
+
+    showTemplateForm(template = null) {
+        const modal = new bootstrap.Modal(document.getElementById('template-form-modal'));
+        const form = document.getElementById('template-form');
+        const title = document.getElementById('template-form-title');
+        
+        if (template) {
+            title.textContent = 'Edit Template';
+            document.getElementById('template-id').value = template.id;
+            document.getElementById('template-name').value = template.name;
+            document.getElementById('template-category').value = template.category;
+            document.getElementById('template-content').value = template.content;
+            this.detectVariables(template.content);
+        } else {
+            title.textContent = 'Create Template';
+            form.reset();
+            document.getElementById('template-id').value = '';
+            document.getElementById('detected-variables').innerHTML = 'Type in the content area to detect variables';
+        }
+        
+        modal.show();
+    }
+
+    detectVariables(content) {
+        const variableRegex = /\{\{(\w+)\}\}/g;
+        const variables = [];
+        let match;
+        
+        while ((match = variableRegex.exec(content)) !== null) {
+            if (!variables.includes(match[1])) {
+                variables.push(match[1]);
+            }
+        }
+        
+        const detectedDiv = document.getElementById('detected-variables');
+        if (variables.length > 0) {
+            detectedDiv.innerHTML = variables.map(v => `<span class="badge bg-info me-1">{{${v}}}</span>`).join('');
+        } else {
+            detectedDiv.innerHTML = 'No variables detected';
+        }
+    }
+
+    async saveTemplate() {
+        const templateId = document.getElementById('template-id').value;
+        const name = document.getElementById('template-name').value;
+        const category = document.getElementById('template-category').value;
+        const content = document.getElementById('template-content').value;
+        
+        if (!name || !content) {
+            alert('Please fill in template name and content');
+            return;
+        }
+        
+        try {
+            const url = templateId ? `/api/templates/${templateId}` : '/api/templates';
+            const method = templateId ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    category: category || 'general',
+                    content: content
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('template-form-modal'));
+                modal.hide();
+                this.loadTemplates();
+                alert(templateId ? 'Template updated successfully!' : 'Template created successfully!');
+            } else {
+                alert('Error saving template: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error saving template:', error);
+            alert('Error saving template. Please try again.');
+        }
+    }
+
+    async editTemplate(templateId) {
+        const template = this.templates.find(t => t.id === templateId);
+        if (template) {
+            this.showTemplateForm(template);
+        }
+    }
+
+    async deleteTemplate(templateId) {
+        if (!confirm('Are you sure you want to delete this template?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/templates/${templateId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.loadTemplates();
+                alert('Template deleted successfully!');
+            } else {
+                alert('Error deleting template: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error deleting template:', error);
+            alert('Error deleting template. Please try again.');
+        }
+    }
+
+    async useTemplate(templateId) {
+        const template = this.templates.find(t => t.id === templateId);
+        if (!template) return;
+        
+        this.currentTemplate = template;
+        
+        // Generate variable input form
+        const variablesForm = document.getElementById('template-variables-form');
+        if (template.variables.length > 0) {
+            variablesForm.innerHTML = template.variables.map(variable => `
+                <div class="mb-3">
+                    <label for="var-${variable}" class="form-label">${variable.charAt(0).toUpperCase() + variable.slice(1)}</label>
+                    <input type="text" class="form-control template-variable" id="var-${variable}" data-variable="${variable}" placeholder="Enter ${variable}">
+                </div>
+            `).join('');
+            
+            // Add event listeners for preview updates
+            document.querySelectorAll('.template-variable').forEach(input => {
+                input.addEventListener('input', () => this.updateTemplatePreview());
+            });
+        } else {
+            variablesForm.innerHTML = '<p class="text-muted">This template has no variables to fill.</p>';
+        }
+        
+        this.updateTemplatePreview();
+        
+        const modal = new bootstrap.Modal(document.getElementById('use-template-modal'));
+        modal.show();
+    }
+
+    updateTemplatePreview() {
+        if (!this.currentTemplate) return;
+        
+        let preview = this.currentTemplate.content;
+        const variableInputs = document.querySelectorAll('.template-variable');
+        
+        variableInputs.forEach(input => {
+            const variable = input.dataset.variable;
+            const value = input.value || `{{${variable}}}`;
+            const regex = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
+            preview = preview.replace(regex, value);
+        });
+        
+        document.getElementById('template-message-preview').textContent = preview;
+    }
+
+    async sendTemplateMessage() {
+        const recipient = document.getElementById('template-recipient').value;
+        
+        if (!recipient) {
+            alert('Please enter a recipient phone number');
+            return;
+        }
+        
+        if (!this.currentTemplate) {
+            alert('No template selected');
+            return;
+        }
+        
+        // Collect variable values
+        const variables = {};
+        document.querySelectorAll('.template-variable').forEach(input => {
+            variables[input.dataset.variable] = input.value;
+        });
+        
+        try {
+            // Process template with variables
+            const response = await fetch(`/api/templates/${this.currentTemplate.id}/process`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ variables })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Send the processed message
+                const sendResponse = await fetch('/api/send-message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        number: recipient,
+                        message: data.processedContent
+                    })
+                });
+                
+                const sendData = await sendResponse.json();
+                
+                if (sendData.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('use-template-modal'));
+                    modal.hide();
+                    alert('Template message sent successfully!');
+                } else {
+                    alert('Error sending message: ' + sendData.message);
+                }
+            } else {
+                alert('Error processing template: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error sending template message:', error);
+            alert('Error sending template message. Please try again.');
+        }
+    }
+
+    async viewTemplate(templateId) {
+        const template = this.templates.find(t => t.id === templateId);
+        if (template) {
+            alert(`Template: ${template.name}\nCategory: ${template.category}\nContent: ${template.content}\nVariables: ${template.variables.join(', ') || 'None'}`);
+        }
+    }
+
     startStatusPolling() {
         // Check status every 3 seconds
         setInterval(() => {
@@ -283,6 +623,7 @@ class WhatsAppEnhanced {
 }
 
 // Initialize the app when the page loads
+let app;
 document.addEventListener('DOMContentLoaded', () => {
-    new WhatsAppEnhanced();
+    app = new WhatsAppEnhanced();
 });
