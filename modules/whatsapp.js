@@ -9,19 +9,30 @@ class WhatsAppManager {
         this.status = 'disconnected';
         this.initializationAttempts = 0;
         this.maxInitializationAttempts = 3;
+        this.autoReconnect = true;
+        this.reconnectTimeout = null;
+        
+        // Auto-initialize on startup
         this.initializeClient();
     }
 
     emitToSocket(event, data) {
-        if (global.socketIo) {
-            global.socketIo.emit(event, data);
+        if (global.io) {
+            global.io.emit(event, data);
+            console.log(`📱 [${new Date().toLocaleTimeString()}] ${event}:`, JSON.stringify(data).substring(0, 100));
         }
     }
 
     async initializeClient() {
         try {
             this.initializationAttempts++;
-            console.log(`Attempting to initialize WhatsApp client (attempt ${this.initializationAttempts}/${this.maxInitializationAttempts})`);
+            console.log(`🔄 [${new Date().toLocaleTimeString()}] Attempting to initialize WhatsApp client (attempt ${this.initializationAttempts}/${this.maxInitializationAttempts})`);
+            
+            // Clear any existing reconnect timeout
+            if (this.reconnectTimeout) {
+                clearTimeout(this.reconnectTimeout);
+                this.reconnectTimeout = null;
+            }
             
             this.client = new Client({
                 authStrategy: new LocalAuth({
@@ -50,20 +61,23 @@ class WhatsAppManager {
             });
             
             this.setupEventListeners();
+            this.status = 'connecting';
+            this.emitToSocket('status_update', this.getStatus());
+            
             await this.client.initialize();
             
         } catch (error) {
-            console.error('Error initializing WhatsApp client:', error);
+            console.error('❌ Error initializing WhatsApp client:', error);
             this.status = 'error';
             this.emitToSocket('status_update', this.getStatus());
             
-            if (this.initializationAttempts < this.maxInitializationAttempts) {
-                console.log('Retrying initialization in 5 seconds...');
-                setTimeout(() => {
+            if (this.initializationAttempts < this.maxInitializationAttempts && this.autoReconnect) {
+                console.log('🔄 Retrying initialization in 5 seconds...');
+                this.reconnectTimeout = setTimeout(() => {
                     this.initializeClient();
                 }, 5000);
             } else {
-                console.error('Max initialization attempts reached. Running in demo mode.');
+                console.error('❌ Max initialization attempts reached. Running in demo mode.');
                 this.status = 'demo_mode';
                 this.emitToSocket('status_update', this.getStatus());
             }
@@ -73,23 +87,24 @@ class WhatsAppManager {
     setupEventListeners() {
         this.client.on('qr', async (qr) => {
             try {
-                console.log('QR Code received');
+                console.log('📱 QR Code received');
                 this.qrCode = await qrcode.toDataURL(qr);
                 this.status = 'qr_ready';
-                console.log('QR Code generated successfully');
+                console.log('📱 QR Code generated successfully');
                 
                 // Emit QR code and status to all connected clients
                 this.emitToSocket('qr_code', { qr: this.qrCode });
                 this.emitToSocket('status_update', this.getStatus());
             } catch (error) {
-                console.error('Error generating QR code:', error);
+                console.error('❌ Error generating QR code:', error);
             }
         });
 
         this.client.on('ready', () => {
-            console.log('WhatsApp Client is ready!');
+            console.log('✅ WhatsApp Client is ready!');
             this.isReady = true;
             this.status = 'ready';
+            this.initializationAttempts = 0; // Reset attempts on success
             
             // Emit ready status to all connected clients
             this.emitToSocket('status_update', this.getStatus());
@@ -100,7 +115,7 @@ class WhatsAppManager {
         });
 
         this.client.on('authenticated', () => {
-            console.log('WhatsApp Client authenticated');
+            console.log('✅ WhatsApp Client authenticated');
             this.status = 'authenticated';
             
             // Emit authentication success
@@ -112,7 +127,7 @@ class WhatsAppManager {
         });
 
         this.client.on('auth_failure', (msg) => {
-            console.error('WhatsApp authentication failed:', msg);
+            console.error('❌ WhatsApp authentication failed:', msg);
             this.status = 'auth_failure';
             
             // Emit authentication failure
@@ -125,7 +140,7 @@ class WhatsAppManager {
         });
 
         this.client.on('disconnected', (reason) => {
-            console.log('WhatsApp Client disconnected:', reason);
+            console.log('⚠️  WhatsApp Client disconnected:', reason);
             this.isReady = false;
             this.status = 'disconnected';
             this.qrCode = null;
@@ -133,21 +148,23 @@ class WhatsAppManager {
             // Emit disconnection
             this.emitToSocket('status_update', this.getStatus());
             this.emitToSocket('disconnected', { 
-                message: 'WhatsApp disconnected. Attempting to reconnect...',
+                message: 'WhatsApp disconnected.',
                 reason: reason,
                 timestamp: new Date().toISOString()
             });
             
-            // Auto-reconnect after 10 seconds
-            setTimeout(() => {
-                console.log('Attempting to reconnect...');
-                this.initializeClient();
-            }, 10000);
+            // Auto-reconnect after 10 seconds if enabled
+            if (this.autoReconnect) {
+                console.log('🔄 Attempting to reconnect in 10 seconds...');
+                this.reconnectTimeout = setTimeout(() => {
+                    this.initializeClient();
+                }, 10000);
+            }
         });
 
         this.client.on('message', (message) => {
             // Log received messages for debugging
-            console.log('Message received:', message.from, message.body);
+            console.log('📩 Message received:', message.from, message.body.substring(0, 50));
             
             // Emit received message to frontend (optional)
             this.emitToSocket('message_received', {
@@ -158,7 +175,7 @@ class WhatsAppManager {
         });
 
         this.client.on('loading_screen', (percent, message) => {
-            console.log('Loading:', percent + '%', message);
+            console.log('⏳ Loading:', percent + '%', message);
             this.emitToSocket('loading_update', { percent, message });
         });
     }
@@ -186,7 +203,7 @@ class WhatsAppManager {
         try {
             const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
             const result = await this.client.sendMessage(chatId, message);
-            console.log(`Message sent successfully to ${number}`);
+            console.log(`✅ Message sent successfully to ${number}`);
             
             // Emit successful message sent
             this.emitToSocket('message_sent', {
@@ -198,7 +215,7 @@ class WhatsAppManager {
             
             return result;
         } catch (error) {
-            console.error(`Failed to send message to ${number}:`, error);
+            console.error(`❌ Failed to send message to ${number}:`, error);
             
             // Emit message send failure
             this.emitToSocket('message_send_error', {
@@ -212,38 +229,109 @@ class WhatsAppManager {
         }
     }
 
+    // Connection control methods
+    async connect() {
+        console.log('🔌 Manual connect requested');
+        if (this.client) {
+            await this.destroy();
+        }
+        this.autoReconnect = true;
+        this.initializationAttempts = 0;
+        await this.initializeClient();
+        return { success: true, message: 'Connection started' };
+    }
+
+    async reconnect() {
+        console.log('🔄 Manual reconnect requested');
+        if (this.client) {
+            await this.destroy();
+        }
+        this.autoReconnect = true;
+        this.initializationAttempts = 0;
+        await this.initializeClient();
+        return { success: true, message: 'Reconnection started' };
+    }
+
+    async disconnect() {
+        console.log('🔌 Manual disconnect requested');
+        this.autoReconnect = false;
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+        await this.destroy();
+        this.status = 'disconnected';
+        this.emitToSocket('status_update', this.getStatus());
+        return { success: true, message: 'Disconnected successfully' };
+    }
+
+    async refreshQR() {
+        console.log('🔄 QR refresh requested');
+        if (this.status === 'qr_ready' && this.client) {
+            // Force QR regeneration by reconnecting
+            await this.reconnect();
+            return { success: true, message: 'QR code refresh started' };
+        } else {
+            return { success: false, message: 'QR code not available for refresh' };
+        }
+    }
+
     getQRCode() {
         return this.qrCode;
     }
 
     getStatus() {
+        const connectedClients = global.io ? global.io.engine.clientsCount : 0;
+        
         return {
             status: this.status,
             isReady: this.isReady,
             demoMode: this.status === 'demo_mode',
             hasQR: !!this.qrCode,
+            autoReconnect: this.autoReconnect,
             timestamp: new Date().toISOString(),
-            connectedClients: global.socketIo ? global.socketIo.getConnectedClients() : 0
+            connectedClients: connectedClients
         };
     }
 
     async destroy() {
         try {
+            if (this.reconnectTimeout) {
+                clearTimeout(this.reconnectTimeout);
+                this.reconnectTimeout = null;
+            }
+            
             if (this.client) {
                 await this.client.destroy();
             }
             this.client = null;
             this.qrCode = null;
             this.isReady = false;
-            this.status = 'disconnected';
-            this.initializationAttempts = 0;
         } catch (error) {
-            console.error('Error destroying WhatsApp client:', error);
+            console.error('❌ Error destroying WhatsApp client:', error);
         }
     }
 }
 
 const whatsappManager = new WhatsAppManager();
+
+// Socket status checker - emit status every 30 seconds
+setInterval(() => {
+    if (global.io) {
+        const clientsCount = global.io.engine.clientsCount;
+        console.log(`🔍 [${new Date().toLocaleTimeString()}] Socket check: clients=${clientsCount}, status=${whatsappManager.status}, hasQR=${!!whatsappManager.qrCode}, isConnected=${whatsappManager.isReady}`);
+        
+        if (clientsCount > 0) {
+            global.io.emit('status_update', whatsappManager.getStatus());
+            
+            if (whatsappManager.qrCode) {
+                console.log('📱 [${new Date().toLocaleTimeString()}] QR Code generated, creating data URL...');
+                global.io.emit('qr_code', { qr: whatsappManager.qrCode });
+                console.log('✅ [${new Date().toLocaleTimeString()}] QR Code sent to all connected clients');
+            }
+        }
+    }
+}, 30000);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
@@ -300,6 +388,39 @@ module.exports = {
                 message: 'Message sent successfully',
                 demo: result.demo || false
             });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+    // New connection control endpoints
+    connect: async (req, res) => {
+        try {
+            const result = await whatsappManager.connect();
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+    reconnect: async (req, res) => {
+        try {
+            const result = await whatsappManager.reconnect();
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+    disconnect: async (req, res) => {
+        try {
+            const result = await whatsappManager.disconnect();
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+    refreshQR: async (req, res) => {
+        try {
+            const result = await whatsappManager.refreshQR();
+            res.json(result);
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });
         }
