@@ -232,6 +232,11 @@ class WhatsAppManager {
             if (this.client) {
                 await this.client.destroy();
             }
+            this.client = null;
+            this.qrCode = null;
+            this.isReady = false;
+            this.status = 'disconnected';
+            this.initializationAttempts = 0;
         } catch (error) {
             console.error('Error destroying WhatsApp client:', error);
         }
@@ -254,6 +259,7 @@ process.on('SIGTERM', async () => {
 });
 
 module.exports = {
+    WhatsAppManager, // Export the class
     whatsappManager,
     getQR: (req, res) => {
         try {
