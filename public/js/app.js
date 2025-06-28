@@ -9,68 +9,99 @@ class WhatsAppEnhanced {
         this.groups = [];
         this.suggestedTokens = [];
         
+        this.debugLog('WhatsApp Enhanced v3 starting...');
         this.initializeSocket();
         this.initializeEventListeners();
         this.loadInitialData();
     }
 
-    initializeSocket() {
-        this.socket = io();
+    debugLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`[${timestamp}] ${message}`);
         
-        this.socket.on('connect', () => {
-            console.log('Socket.IO connected');
-            this.isConnected = true;
-            this.updateWebSocketStatus('connected', 'Connected');
-        });
-
-        this.socket.on('disconnect', () => {
-            console.log('Socket.IO disconnected');
-            this.isConnected = false;
-            this.updateWebSocketStatus('disconnected', 'Disconnected');
-        });
-
-        this.socket.on('status_update', (status) => {
-            this.updateStatus(status);
-        });
-
-        this.socket.on('qr_code', (data) => {
-            this.displayQRCode(data.qr);
-        });
-
-        this.socket.on('connection_ready', (data) => {
-            this.showNotification('success', 'WhatsApp Connected!', data.message);
-        });
-
-        this.socket.on('authenticated', (data) => {
-            this.showNotification('success', 'Authenticated!', data.message);
-        });
-
-        this.socket.on('auth_failure', (data) => {
-            this.showNotification('error', 'Authentication Failed', data.message);
-        });
-
-        this.socket.on('disconnected', (data) => {
-            this.showNotification('warning', 'Disconnected', data.message);
-        });
-
-        this.socket.on('message_sent', (data) => {
-            if (data.demo) {
-                this.showNotification('info', 'Demo Mode', `Demo message sent to ${data.number}`);
-            } else {
-                this.showNotification('success', 'Message Sent', `Message sent to ${data.number}`);
+        const debugElement = document.getElementById('debug-text');
+        if (debugElement) {
+            debugElement.innerHTML += `<br>[${timestamp}] ${message}`;
+            // Show debug info
+            document.getElementById('debug-info').style.display = 'block';
+            // Keep only last 10 lines
+            const lines = debugElement.innerHTML.split('<br>');
+            if (lines.length > 10) {
+                debugElement.innerHTML = lines.slice(-10).join('<br>');
             }
-        });
+        }
+    }
 
-        this.socket.on('message_send_error', (data) => {
-            this.showNotification('error', 'Send Failed', `Failed to send message to ${data.number}: ${data.error}`);
-        });
+    initializeSocket() {
+        try {
+            this.debugLog('Initializing Socket.IO connection...');
+            this.socket = io();
+            
+            this.socket.on('connect', () => {
+                this.debugLog('Socket.IO connected successfully');
+                this.isConnected = true;
+                this.updateWebSocketStatus('connected', 'Connected');
+            });
 
-        this.socket.on('loading_update', (data) => {
-            this.updateLoadingProgress(data.percent, data.message);
-        });
+            this.socket.on('disconnect', () => {
+                this.debugLog('Socket.IO disconnected');
+                this.isConnected = false;
+                this.updateWebSocketStatus('disconnected', 'Disconnected');
+            });
+
+            this.socket.on('status_update', (status) => {
+                this.debugLog(`Status update received: ${status.status}`);
+                this.updateStatus(status);
+            });
+
+            this.socket.on('qr_code', (data) => {
+                this.debugLog('QR code received from server');
+                this.displayQRCode(data.qr);
+            });
+
+            this.socket.on('connection_ready', (data) => {
+                this.debugLog('WhatsApp connection ready');
+                this.showNotification('success', 'WhatsApp Connected!', data.message);
+            });
+
+            this.socket.on('authenticated', (data) => {
+                this.debugLog('WhatsApp authenticated');
+                this.showNotification('success', 'Authenticated!', data.message);
+            });
+
+            this.socket.on('auth_failure', (data) => {
+                this.debugLog('WhatsApp authentication failed');
+                this.showNotification('error', 'Authentication Failed', data.message);
+            });
+
+            this.socket.on('disconnected', (data) => {
+                this.debugLog('WhatsApp disconnected');
+                this.showNotification('warning', 'Disconnected', data.message);
+            });
+
+            this.socket.on('message_sent', (data) => {
+                if (data.demo) {
+                    this.showNotification('info', 'Demo Mode', `Demo message sent to ${data.number}`);
+                } else {
+                    this.showNotification('success', 'Message Sent', `Message sent to ${data.number}`);
+                }
+            });
+
+            this.socket.on('message_send_error', (data) => {
+                this.showNotification('error', 'Send Failed', `Failed to send message to ${data.number}: ${data.error}`);
+            });
+
+            this.socket.on('loading_update', (data) => {
+                this.updateLoadingProgress(data.percent, data.message);
+            });
+
+        } catch (error) {
+            this.debugLog(`Socket initialization error: ${error.message}`);
+        }
     }
 
     updateWebSocketStatus(status, text) {
+        this.debugLog(`WebSocket status: ${status} - ${text}`);
         const statusElement = document.getElementById('websocket-status');
         const statusText = document.getElementById('ws-status-text');
         
@@ -84,6 +115,7 @@ class WhatsAppEnhanced {
 
     updateStatus(status) {
         this.currentStatus = status.status;
+        this.debugLog(`Status updated to: ${status.status}`);
         
         const statusIndicator = document.querySelector('.status-indicator');
         const statusText = document.getElementById('status-text');
@@ -92,14 +124,18 @@ class WhatsAppEnhanced {
         const loadingStatus = document.getElementById('loading-status');
         
         // Update status indicator
-        statusIndicator.className = `status-indicator status-${status.status}`;
+        if (statusIndicator) {
+            statusIndicator.className = `status-indicator status-${status.status}`;
+        }
         
         // Update status text
         let statusMessage = this.getStatusMessage(status.status, status.demoMode);
-        statusText.textContent = statusMessage;
+        if (statusText) {
+            statusText.textContent = statusMessage;
+        }
         
         // Update client count
-        if (status.connectedClients !== undefined) {
+        if (status.connectedClients !== undefined && clientCount) {
             clientCount.textContent = `${status.connectedClients} clients`;
             clientCount.style.display = 'inline';
         }
@@ -108,13 +144,13 @@ class WhatsAppEnhanced {
         this.updateConnectionButtons(status.status);
         
         // Show/hide QR container
-        if (status.status === 'qr_ready') {
+        if (status.status === 'qr_ready' && qrContainer) {
             qrContainer.style.display = 'block';
-            loadingStatus.style.display = 'none';
-        } else if (status.status === 'ready' || status.status === 'authenticated') {
+            if (loadingStatus) loadingStatus.style.display = 'none';
+        } else if ((status.status === 'ready' || status.status === 'authenticated') && qrContainer) {
             qrContainer.style.display = 'none';
-            loadingStatus.style.display = 'none';
-        } else {
+            if (loadingStatus) loadingStatus.style.display = 'none';
+        } else if (loadingStatus) {
             loadingStatus.style.display = 'none';
         }
     }
@@ -126,28 +162,34 @@ class WhatsAppEnhanced {
         const refreshQrBtn = document.getElementById('refresh-qr-btn');
         
         // Hide all buttons first
-        connectBtn.style.display = 'none';
-        reconnectBtn.style.display = 'none';
-        disconnectBtn.style.display = 'none';
-        refreshQrBtn.style.display = 'none';
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (reconnectBtn) reconnectBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        if (refreshQrBtn) refreshQrBtn.style.display = 'none';
+        
+        this.debugLog(`Updating buttons for status: ${status}`);
         
         switch (status) {
             case 'disconnected':
-                connectBtn.style.display = 'inline-block';
+                if (connectBtn) connectBtn.style.display = 'inline-block';
+                break;
+            case 'connecting':
+                if (reconnectBtn) reconnectBtn.style.display = 'inline-block';
+                if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
                 break;
             case 'qr_ready':
-                reconnectBtn.style.display = 'inline-block';
-                refreshQrBtn.style.display = 'inline-block';
-                disconnectBtn.style.display = 'inline-block';
+                if (reconnectBtn) reconnectBtn.style.display = 'inline-block';
+                if (refreshQrBtn) refreshQrBtn.style.display = 'inline-block';
+                if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
                 break;
             case 'authenticated':
             case 'ready':
-                disconnectBtn.style.display = 'inline-block';
-                reconnectBtn.style.display = 'inline-block';
+                if (disconnectBtn) disconnectBtn.style.display = 'inline-block';
+                if (reconnectBtn) reconnectBtn.style.display = 'inline-block';
                 break;
             case 'auth_failure':
             case 'error':
-                connectBtn.style.display = 'inline-block';
+                if (connectBtn) connectBtn.style.display = 'inline-block';
                 break;
         }
     }
@@ -157,6 +199,7 @@ class WhatsAppEnhanced {
         
         switch (status) {
             case 'disconnected': return 'Disconnected';
+            case 'connecting': return 'Connecting...';
             case 'qr_ready': return 'Scan QR Code to Connect';
             case 'authenticated': return 'Authenticated - Loading...';
             case 'ready': return 'Connected and Ready';
@@ -167,11 +210,16 @@ class WhatsAppEnhanced {
     }
 
     displayQRCode(qrDataUrl) {
+        this.debugLog('Displaying QR code');
         const qrImage = document.getElementById('qr-image');
         const qrContainer = document.getElementById('qr-container');
         
-        qrImage.src = qrDataUrl;
-        qrContainer.style.display = 'block';
+        if (qrImage && qrDataUrl) {
+            qrImage.src = qrDataUrl;
+        }
+        if (qrContainer) {
+            qrContainer.style.display = 'block';
+        }
     }
 
     updateLoadingProgress(percent, message) {
@@ -179,18 +227,29 @@ class WhatsAppEnhanced {
         const progressBar = document.getElementById('loading-progress');
         const loadingMessage = document.getElementById('loading-message');
         
-        loadingStatus.style.display = 'block';
-        progressBar.style.width = `${percent}%`;
-        progressBar.textContent = `${percent}%`;
-        loadingMessage.textContent = message;
+        if (loadingStatus) loadingStatus.style.display = 'block';
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+            progressBar.textContent = `${percent}%`;
+        }
+        if (loadingMessage) loadingMessage.textContent = message;
     }
 
     // Connection control functions
     async connectWhatsApp() {
         try {
+            this.debugLog('Connect button clicked');
             this.showNotification('info', 'Connecting...', 'Initializing WhatsApp connection');
-            const response = await fetch('/api/whatsapp/connect', { method: 'POST' });
+            
+            const response = await fetch('/api/whatsapp/connect', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             const result = await response.json();
+            this.debugLog(`Connect response: ${JSON.stringify(result)}`);
             
             if (result.success) {
                 this.showNotification('success', 'Connection Started', result.message);
@@ -198,15 +257,25 @@ class WhatsAppEnhanced {
                 this.showNotification('error', 'Connection Failed', result.message);
             }
         } catch (error) {
+            this.debugLog(`Connect error: ${error.message}`);
             this.showNotification('error', 'Connection Error', 'Failed to start WhatsApp connection');
         }
     }
 
     async reconnectWhatsApp() {
         try {
+            this.debugLog('Reconnect button clicked');
             this.showNotification('info', 'Reconnecting...', 'Restarting WhatsApp connection');
-            const response = await fetch('/api/whatsapp/reconnect', { method: 'POST' });
+            
+            const response = await fetch('/api/whatsapp/reconnect', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             const result = await response.json();
+            this.debugLog(`Reconnect response: ${JSON.stringify(result)}`);
             
             if (result.success) {
                 this.showNotification('success', 'Reconnection Started', result.message);
@@ -214,15 +283,25 @@ class WhatsAppEnhanced {
                 this.showNotification('error', 'Reconnection Failed', result.message);
             }
         } catch (error) {
+            this.debugLog(`Reconnect error: ${error.message}`);
             this.showNotification('error', 'Reconnection Error', 'Failed to reconnect to WhatsApp');
         }
     }
 
     async disconnectWhatsApp() {
         try {
+            this.debugLog('Disconnect button clicked');
             this.showNotification('info', 'Disconnecting...', 'Stopping WhatsApp connection');
-            const response = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+            
+            const response = await fetch('/api/whatsapp/disconnect', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             const result = await response.json();
+            this.debugLog(`Disconnect response: ${JSON.stringify(result)}`);
             
             if (result.success) {
                 this.showNotification('success', 'Disconnected', result.message);
@@ -230,15 +309,25 @@ class WhatsAppEnhanced {
                 this.showNotification('error', 'Disconnection Failed', result.message);
             }
         } catch (error) {
+            this.debugLog(`Disconnect error: ${error.message}`);
             this.showNotification('error', 'Disconnection Error', 'Failed to disconnect from WhatsApp');
         }
     }
 
     async refreshQR() {
         try {
+            this.debugLog('Refresh QR button clicked');
             this.showNotification('info', 'Refreshing...', 'Generating new QR code');
-            const response = await fetch('/api/whatsapp/refresh-qr', { method: 'POST' });
+            
+            const response = await fetch('/api/whatsapp/refresh-qr', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             const result = await response.json();
+            this.debugLog(`Refresh QR response: ${JSON.stringify(result)}`);
             
             if (result.success) {
                 this.showNotification('success', 'QR Refreshed', result.message);
@@ -246,6 +335,7 @@ class WhatsAppEnhanced {
                 this.showNotification('error', 'Refresh Failed', result.message);
             }
         } catch (error) {
+            this.debugLog(`Refresh QR error: ${error.message}`);
             this.showNotification('error', 'Refresh Error', 'Failed to refresh QR code');
         }
     }
@@ -282,128 +372,87 @@ class WhatsAppEnhanced {
     }
 
     initializeEventListeners() {
+        this.debugLog('Initializing event listeners...');
+        
+        // Connection control buttons
+        const connectBtn = document.getElementById('connect-btn');
+        const reconnectBtn = document.getElementById('reconnect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const refreshQrBtn = document.getElementById('refresh-qr-btn');
+        
+        if (connectBtn) {
+            connectBtn.addEventListener('click', () => this.connectWhatsApp());
+            this.debugLog('Connect button listener added');
+        }
+        
+        if (reconnectBtn) {
+            reconnectBtn.addEventListener('click', () => this.reconnectWhatsApp());
+            this.debugLog('Reconnect button listener added');
+        }
+        
+        if (disconnectBtn) {
+            disconnectBtn.addEventListener('click', () => this.disconnectWhatsApp());
+            this.debugLog('Disconnect button listener added');
+        }
+        
+        if (refreshQrBtn) {
+            refreshQrBtn.addEventListener('click', () => this.refreshQR());
+            this.debugLog('Refresh QR button listener added');
+        }
+
         // Quick send form
-        document.getElementById('quick-send-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.sendQuickMessage();
-        });
+        const quickSendForm = document.getElementById('quick-send-form');
+        if (quickSendForm) {
+            quickSendForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.sendQuickMessage();
+            });
+        }
 
         // Bulk messaging forms
-        document.getElementById('manual-bulk-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.sendManualBulk();
-        });
+        const manualBulkForm = document.getElementById('manual-bulk-form');
+        if (manualBulkForm) {
+            manualBulkForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.sendManualBulk();
+            });
+        }
 
-        document.getElementById('csv-bulk-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.sendCSVBulk();
-        });
+        const csvBulkForm = document.getElementById('csv-bulk-form');
+        if (csvBulkForm) {
+            csvBulkForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.sendCSVBulk();
+            });
+        }
 
         // Template management
-        document.getElementById('create-template-btn').addEventListener('click', () => {
-            this.showTemplateModal();
-        });
-
-        document.getElementById('save-template-btn').addEventListener('click', () => {
-            this.saveTemplate();
-        });
-
-        document.getElementById('template-content').addEventListener('input', () => {
-            this.detectTemplateVariables();
-        });
-
-        // Contact management
-        const addContactBtn = document.getElementById('add-contact-btn');
-        if (addContactBtn) {
-            addContactBtn.addEventListener('click', () => {
-                this.showAddContactModal();
+        const createTemplateBtn = document.getElementById('create-template-btn');
+        if (createTemplateBtn) {
+            createTemplateBtn.addEventListener('click', () => {
+                this.showTemplateModal();
             });
         }
 
-        const saveContactBtn = document.getElementById('save-contact-btn');
-        if (saveContactBtn) {
-            saveContactBtn.addEventListener('click', () => {
-                this.saveContact();
+        const saveTemplateBtn = document.getElementById('save-template-btn');
+        if (saveTemplateBtn) {
+            saveTemplateBtn.addEventListener('click', () => {
+                this.saveTemplate();
             });
         }
 
-        const importContactsBtn = document.getElementById('import-contacts-btn');
-        if (importContactsBtn) {
-            importContactsBtn.addEventListener('click', () => {
-                this.showImportContactsModal();
-            });
-        }
-
-        const importContactsBtnModal = document.getElementById('import-contacts-btn-modal');
-        if (importContactsBtnModal) {
-            importContactsBtnModal.addEventListener('click', () => {
-                this.importContacts();
-            });
-        }
-
-        const createGroupBtn = document.getElementById('create-group-btn');
-        if (createGroupBtn) {
-            createGroupBtn.addEventListener('click', () => {
-                this.showCreateGroupModal();
-            });
-        }
-
-        const saveGroupBtn = document.getElementById('save-group-btn');
-        if (saveGroupBtn) {
-            saveGroupBtn.addEventListener('click', () => {
-                this.saveGroup();
+        const templateContent = document.getElementById('template-content');
+        if (templateContent) {
+            templateContent.addEventListener('input', () => {
+                this.detectTemplateVariables();
             });
         }
 
         // Search and filters
-        const contactSearch = document.getElementById('contact-search');
-        if (contactSearch) {
-            contactSearch.addEventListener('input', (e) => {
-                this.filterContacts(e.target.value);
-            });
-        }
-
-        const contactTagFilter = document.getElementById('contact-tag-filter');
-        if (contactTagFilter) {
-            contactTagFilter.addEventListener('change', (e) => {
-                this.filterContactsByTag(e.target.value);
-            });
-        }
-
-        document.getElementById('category-filter').addEventListener('change', (e) => {
-            this.filterTemplatesByCategory(e.target.value);
-        });
-
-        // Personalization
-        const personalizeMessage = document.getElementById('personalize-message');
-        if (personalizeMessage) {
-            personalizeMessage.addEventListener('input', () => {
-                this.updatePersonalizationTokens();
-                this.updatePersonalizationPreview();
-            });
-        }
-
-        const personalizeForm = document.getElementById('personalize-form');
-        if (personalizeForm) {
-            personalizeForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.sendPersonalizedMessage();
-            });
-        }
-
-        const bulkPersonalizeForm = document.getElementById('bulk-personalize-form');
-        if (bulkPersonalizeForm) {
-            bulkPersonalizeForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.sendBulkPersonalized();
-            });
-        }
-
-        const groupPersonalizeForm = document.getElementById('group-personalize-form');
-        if (groupPersonalizeForm) {
-            groupPersonalizeForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.sendGroupPersonalized();
+        const categoryFilter = document.getElementById('category-filter');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', (e) => {
+                this.filterTemplatesByCategory(e.target.value);
             });
         }
 
@@ -422,17 +471,17 @@ class WhatsAppEnhanced {
                 }
             });
         });
+        
+        this.debugLog('Event listeners initialized');
     }
 
     async loadInitialData() {
         try {
+            this.debugLog('Loading initial data...');
             await this.loadTemplates();
-            await this.loadContacts();
-            await this.loadGroups();
-            await this.loadSuggestedTokens();
-            this.updateContactTagFilter();
+            this.debugLog('Initial data loaded');
         } catch (error) {
-            console.error('Error loading initial data:', error);
+            this.debugLog(`Error loading initial data: ${error.message}`);
         }
     }
 
@@ -468,6 +517,7 @@ class WhatsAppEnhanced {
     // Template Functions
     async loadTemplates() {
         try {
+            this.debugLog('Loading templates...');
             const response = await fetch('/api/templates');
             const result = await response.json();
             
@@ -475,14 +525,18 @@ class WhatsAppEnhanced {
                 this.templates = result.templates;
                 this.displayTemplates();
                 this.updateCategoryFilter();
+                this.debugLog(`Loaded ${this.templates.length} templates`);
+            } else {
+                this.debugLog(`Failed to load templates: ${result.message}`);
             }
         } catch (error) {
-            console.error('Error loading templates:', error);
+            this.debugLog(`Error loading templates: ${error.message}`);
         }
     }
 
     displayTemplates() {
         const container = document.getElementById('templates-list');
+        if (!container) return;
         
         if (this.templates.length === 0) {
             container.innerHTML = '<div class="col-12"><p class="text-muted">No templates found. Create your first template!</p></div>';
@@ -580,40 +634,51 @@ class WhatsAppEnhanced {
         const summary = document.getElementById('bulk-summary');
         const details = document.getElementById('bulk-details');
         
-        if (results) {
+        if (results && container && summary) {
             container.style.display = 'block';
             summary.innerHTML = `<strong>Total: ${results.length}</strong>`;
-            // Add more detailed results display if needed
         }
     }
 
-    // Stub functions for the rest of the functionality
-    showTemplateModal() { console.log('Template modal'); }
-    saveTemplate() { console.log('Save template'); }
-    detectTemplateVariables() { console.log('Detect variables'); }
-    showAddContactModal() { console.log('Add contact modal'); }
-    saveContact() { console.log('Save contact'); }
-    showImportContactsModal() { console.log('Import contacts modal'); }
-    importContacts() { console.log('Import contacts'); }
-    showCreateGroupModal() { console.log('Create group modal'); }
-    saveGroup() { console.log('Save group'); }
-    filterContacts() { console.log('Filter contacts'); }
-    filterContactsByTag() { console.log('Filter by tag'); }
-    filterTemplatesByCategory() { console.log('Filter templates'); }
-    updatePersonalizationTokens() { console.log('Update tokens'); }
-    updatePersonalizationPreview() { console.log('Update preview'); }
-    sendPersonalizedMessage() { console.log('Send personalized'); }
-    sendBulkPersonalized() { console.log('Bulk personalized'); }
-    sendGroupPersonalized() { console.log('Group personalized'); }
-    loadContacts() { console.log('Load contacts'); }
-    loadGroups() { console.log('Load groups'); }
-    loadSuggestedTokens() { console.log('Load tokens'); }
-    loadGroupsForPersonalization() { console.log('Load groups for personalization'); }
-    updateContactTagFilter() { console.log('Update contact tag filter'); }
-    updateCategoryFilter() { console.log('Update category filter'); }
-    useTemplate() { console.log('Use template'); }
-    editTemplate() { console.log('Edit template'); }
-    deleteTemplate() { console.log('Delete template'); }
+    // Stub functions for template functionality - to be implemented in next steps
+    showTemplateModal() { 
+        this.debugLog('Show template modal - not implemented yet'); 
+        this.showNotification('info', 'Coming Soon', 'Template creation will be implemented in the next step');
+    }
+    
+    saveTemplate() { 
+        this.debugLog('Save template - not implemented yet'); 
+    }
+    
+    detectTemplateVariables() { 
+        this.debugLog('Detect template variables - not implemented yet'); 
+    }
+    
+    updateCategoryFilter() { 
+        this.debugLog('Update category filter - not implemented yet'); 
+    }
+    
+    filterTemplatesByCategory() { 
+        this.debugLog('Filter templates by category - not implemented yet'); 
+    }
+    
+    useTemplate() { 
+        this.debugLog('Use template - not implemented yet'); 
+    }
+    
+    editTemplate() { 
+        this.debugLog('Edit template - not implemented yet'); 
+    }
+    
+    deleteTemplate() { 
+        this.debugLog('Delete template - not implemented yet'); 
+    }
+
+    // Stub functions for other functionality
+    loadContacts() { this.debugLog('Load contacts - not implemented yet'); }
+    loadGroups() { this.debugLog('Load groups - not implemented yet'); }
+    loadSuggestedTokens() { this.debugLog('Load suggested tokens - not implemented yet'); }
+    loadGroupsForPersonalization() { this.debugLog('Load groups for personalization - not implemented yet'); }
 }
 
 // Initialize the application
@@ -622,5 +687,14 @@ const app = new WhatsAppEnhanced();
 // Global error handler
 window.addEventListener('error', (event) => {
     console.error('Global error:', event.error);
-    app.showNotification('error', 'Application Error', 'An unexpected error occurred');
+    if (app) {
+        app.debugLog(`Global error: ${event.error.message}`);
+        app.showNotification('error', 'Application Error', 'An unexpected error occurred');
+    }
+});
+
+window.addEventListener('load', () => {
+    if (app) {
+        app.debugLog('Window loaded, application ready');
+    }
 });
