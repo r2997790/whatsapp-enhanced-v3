@@ -2,14 +2,27 @@ class WhatsAppEnhanced {
     constructor() {
         this.currentTemplate = null;
         this.templates = [];
+        this.isWhatsAppAvailable = false;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.checkServerHealth();
         this.checkStatus();
         this.startStatusPolling();
         this.loadTemplates();
+    }
+
+    async checkServerHealth() {
+        try {
+            const response = await fetch('/health');
+            const data = await response.json();
+            console.log('Server health:', data);
+            this.isWhatsAppAvailable = data.modules.whatsapp;
+        } catch (error) {
+            console.error('Error checking server health:', error);
+        }
     }
 
     setupEventListeners() {
@@ -63,13 +76,14 @@ class WhatsAppEnhanced {
         try {
             const response = await fetch('/api/status');
             const data = await response.json();
-            this.updateStatus(data.status);
+            this.updateStatus(data.status, data.demoMode);
             
             if (data.status === 'qr_ready') {
                 this.loadQRCode();
             }
         } catch (error) {
             console.error('Error checking status:', error);
+            this.updateStatus('unavailable');
         }
     }
 
@@ -81,13 +95,15 @@ class WhatsAppEnhanced {
             if (data.success && data.qr) {
                 document.getElementById('qr-image').src = data.qr;
                 document.getElementById('qr-container').style.display = 'block';
+            } else {
+                console.log('QR code not available:', data.message);
             }
         } catch (error) {
             console.error('Error loading QR code:', error);
         }
     }
 
-    updateStatus(status) {
+    updateStatus(status, demoMode = false) {
         const statusIndicator = document.querySelector('.status-indicator');
         const statusText = document.getElementById('status-text');
         const qrContainer = document.getElementById('qr-container');
@@ -103,14 +119,43 @@ class WhatsAppEnhanced {
             'disconnected': 'Disconnected',
             'qr_ready': 'Scan QR Code',
             'authenticated': 'Authenticated',
-            'ready': 'Connected & Ready'
+            'ready': 'Connected & Ready',
+            'demo_mode': 'Demo Mode (WhatsApp Unavailable)',
+            'unavailable': 'WhatsApp Service Unavailable',
+            'error': 'Connection Error'
         };
         
-        statusText.textContent = statusTexts[status] || status;
+        let displayText = statusTexts[status] || status;
+        if (demoMode) {
+            displayText = 'Demo Mode - Full UI Available';
+            statusIndicator.classList.add('status-ready'); // Show as ready for demo
+        }
+        
+        statusText.textContent = displayText;
         
         // Hide QR code if not needed
         if (status !== 'qr_ready') {
             qrContainer.style.display = 'none';
+        }
+
+        // Show demo mode notice
+        this.showDemoNotice(demoMode || status === 'demo_mode' || status === 'unavailable');
+    }
+
+    showDemoNotice(isDemo) {
+        let demoNotice = document.getElementById('demo-notice');
+        
+        if (isDemo && !demoNotice) {
+            const noticeHtml = `
+                <div id="demo-notice" class="alert alert-info alert-dismissible fade show" role="alert">
+                    <strong>Demo Mode:</strong> WhatsApp connection is unavailable, but you can still explore all features. 
+                    Templates, contacts, and bulk messaging interfaces are fully functional for demonstration.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.querySelector('.container').insertAdjacentHTML('afterbegin', noticeHtml);
+        } else if (!isDemo && demoNotice) {
+            demoNotice.remove();
         }
     }
 
@@ -138,7 +183,8 @@ class WhatsAppEnhanced {
             const data = await response.json();
             
             if (data.success) {
-                alert('Message sent successfully!');
+                const demoText = data.demo ? ' (Demo Mode - Message not actually sent)' : '';
+                alert('Message sent successfully!' + demoText);
                 document.getElementById('message').value = '';
             } else {
                 alert('Error sending message: ' + data.message);
@@ -318,7 +364,19 @@ class WhatsAppEnhanced {
             }
         } catch (error) {
             console.error('Error loading templates:', error);
+            this.showTemplateError();
         }
+    }
+
+    showTemplateError() {
+        const templatesContainer = document.getElementById('templates-list');
+        templatesContainer.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    Templates service is currently unavailable. Please try again later.
+                </div>
+            </div>
+        `;
     }
 
     async loadCategories() {
@@ -594,7 +652,8 @@ class WhatsAppEnhanced {
                 if (sendData.success) {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('use-template-modal'));
                     modal.hide();
-                    alert('Template message sent successfully!');
+                    const demoText = sendData.demo ? ' (Demo Mode)' : '';
+                    alert('Template message sent successfully!' + demoText);
                 } else {
                     alert('Error sending message: ' + sendData.message);
                 }
@@ -615,10 +674,10 @@ class WhatsAppEnhanced {
     }
 
     startStatusPolling() {
-        // Check status every 3 seconds
+        // Check status every 5 seconds (less frequent to reduce load)
         setInterval(() => {
             this.checkStatus();
-        }, 3000);
+        }, 5000);
     }
 }
 
