@@ -10,6 +10,10 @@ class WhatsAppEnhanced {
         this.suggestedTokens = [];
         
         this.debugLog('WhatsApp Enhanced v3 starting...');
+        
+        // Initialize template manager
+        this.templateManager = new TemplateManager(this);
+        
         this.initializeSocket();
         this.initializeEventListeners();
         this.loadInitialData();
@@ -426,25 +430,25 @@ class WhatsAppEnhanced {
             });
         }
 
-        // Template management
+        // Template management - delegate to template manager
         const createTemplateBtn = document.getElementById('create-template-btn');
         if (createTemplateBtn) {
             createTemplateBtn.addEventListener('click', () => {
-                this.showTemplateModal();
+                this.templateManager.showTemplateModal();
             });
         }
 
         const saveTemplateBtn = document.getElementById('save-template-btn');
         if (saveTemplateBtn) {
             saveTemplateBtn.addEventListener('click', () => {
-                this.saveTemplate();
+                this.templateManager.saveTemplate();
             });
         }
 
         const templateContent = document.getElementById('template-content');
         if (templateContent) {
             templateContent.addEventListener('input', () => {
-                this.detectTemplateVariables();
+                this.templateManager.detectTemplateVariables();
             });
         }
 
@@ -452,7 +456,7 @@ class WhatsAppEnhanced {
         const categoryFilter = document.getElementById('category-filter');
         if (categoryFilter) {
             categoryFilter.addEventListener('change', (e) => {
-                this.filterTemplatesByCategory(e.target.value);
+                this.templateManager.filterTemplatesByCategory(e.target.value);
             });
         }
 
@@ -464,7 +468,7 @@ class WhatsAppEnhanced {
                     this.loadContacts();
                     this.loadGroups();
                 } else if (target === '#templates') {
-                    this.loadTemplates();
+                    this.templateManager.loadTemplates();
                 } else if (target === '#personalization') {
                     this.loadSuggestedTokens();
                     this.loadGroupsForPersonalization();
@@ -478,7 +482,7 @@ class WhatsAppEnhanced {
     async loadInitialData() {
         try {
             this.debugLog('Loading initial data...');
-            await this.loadTemplates();
+            await this.templateManager.loadTemplates();
             this.debugLog('Initial data loaded');
         } catch (error) {
             this.debugLog(`Error loading initial data: ${error.message}`);
@@ -512,52 +516,6 @@ class WhatsAppEnhanced {
         } catch (error) {
             this.showNotification('error', 'Network Error', 'Failed to send message');
         }
-    }
-
-    // Template Functions
-    async loadTemplates() {
-        try {
-            this.debugLog('Loading templates...');
-            const response = await fetch('/api/templates');
-            const result = await response.json();
-            
-            if (result.success) {
-                this.templates = result.templates;
-                this.displayTemplates();
-                this.updateCategoryFilter();
-                this.debugLog(`Loaded ${this.templates.length} templates`);
-            } else {
-                this.debugLog(`Failed to load templates: ${result.message}`);
-            }
-        } catch (error) {
-            this.debugLog(`Error loading templates: ${error.message}`);
-        }
-    }
-
-    displayTemplates() {
-        const container = document.getElementById('templates-list');
-        if (!container) return;
-        
-        if (this.templates.length === 0) {
-            container.innerHTML = '<div class="col-12"><p class="text-muted">No templates found. Create your first template!</p></div>';
-            return;
-        }
-
-        container.innerHTML = this.templates.map(template => `
-            <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card template-card h-100" onclick="app.useTemplate('${template.id}')">
-                    <div class="card-body">
-                        <h6 class="card-title">${template.name}</h6>
-                        <span class="badge bg-primary mb-2">${template.category || 'General'}</span>
-                        <p class="card-text small">${template.content.substring(0, 100)}${template.content.length > 100 ? '...' : ''}</p>
-                        <div class="d-flex justify-content-between">
-                            <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); app.editTemplate('${template.id}')">Edit</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); app.deleteTemplate('${template.id}')">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
     }
 
     // Bulk messaging functions
@@ -638,40 +596,6 @@ class WhatsAppEnhanced {
             container.style.display = 'block';
             summary.innerHTML = `<strong>Total: ${results.length}</strong>`;
         }
-    }
-
-    // Stub functions for template functionality - to be implemented in next steps
-    showTemplateModal() { 
-        this.debugLog('Show template modal - not implemented yet'); 
-        this.showNotification('info', 'Coming Soon', 'Template creation will be implemented in the next step');
-    }
-    
-    saveTemplate() { 
-        this.debugLog('Save template - not implemented yet'); 
-    }
-    
-    detectTemplateVariables() { 
-        this.debugLog('Detect template variables - not implemented yet'); 
-    }
-    
-    updateCategoryFilter() { 
-        this.debugLog('Update category filter - not implemented yet'); 
-    }
-    
-    filterTemplatesByCategory() { 
-        this.debugLog('Filter templates by category - not implemented yet'); 
-    }
-    
-    useTemplate() { 
-        this.debugLog('Use template - not implemented yet'); 
-    }
-    
-    editTemplate() { 
-        this.debugLog('Edit template - not implemented yet'); 
-    }
-    
-    deleteTemplate() { 
-        this.debugLog('Delete template - not implemented yet'); 
     }
 
     // Stub functions for other functionality
