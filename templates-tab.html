@@ -1,0 +1,113 @@
+                    <!-- Templates Tab -->
+                    <div class="tab-pane fade" id="templates" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Message Templates</h5>
+                                <button class="btn btn-primary btn-sm" id="create-template-btn">Create New Template</button>
+                            </div>
+                            <div class="card-body">
+                                <p>Create and manage reusable message templates with personalization variables.</p>
+                                
+                                <!-- Template Categories Filter -->
+                                <div class="mb-3">
+                                    <label for="category-filter" class="form-label">Filter by Category:</label>
+                                    <select class="form-select" id="category-filter">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Templates List -->
+                                <div id="templates-list" class="row">
+                                    <!-- Templates will be loaded here -->
+                                </div>
+                                
+                                <!-- Template Preview Modal -->
+                                <div class="modal fade" id="template-preview-modal" tabindex="-1">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Template Preview</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div id="template-preview-content"></div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="button" class="btn btn-primary" id="use-template-btn">Use Template</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Create/Edit Template Modal -->
+                                <div class="modal fade" id="template-form-modal" tabindex="-1">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="template-form-title">Create Template</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <form id="template-form">
+                                                    <input type="hidden" id="template-id">
+                                                    <div class="mb-3">
+                                                        <label for="template-name" class="form-label">Template Name</label>
+                                                        <input type="text" class="form-control" id="template-name" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label for="template-category" class="form-label">Category</label>
+                                                        <input type="text" class="form-control" id="template-category" placeholder="e.g., marketing, appointments, general">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label for="template-content" class="form-label">Message Content</label>
+                                                        <textarea class="form-control" id="template-content" rows="6" placeholder="Use {{variable}} for personalization, e.g., Hi {{name}}, your appointment is on {{date}}." required></textarea>
+                                                        <small class="form-text text-muted">Use {{variableName}} for personalization tokens</small>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Variables Detected:</label>
+                                                        <div id="detected-variables" class="alert alert-info">
+                                                            Type in the content area to detect variables
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="button" class="btn btn-primary" id="save-template-btn">Save Template</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Use Template Modal -->
+                                <div class="modal fade" id="use-template-modal" tabindex="-1">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Use Template</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div id="template-variables-form">
+                                                    <!-- Variable inputs will be generated here -->
+                                                </div>
+                                                <div class="mt-3">
+                                                    <label class="form-label">Preview:</label>
+                                                    <div id="template-message-preview" class="alert alert-light border"></div>
+                                                </div>
+                                                <div class="mt-3">
+                                                    <label for="template-recipient" class="form-label">Send to:</label>
+                                                    <input type="text" class="form-control" id="template-recipient" placeholder="+1234567890">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="button" class="btn btn-primary" id="send-template-btn">Send Message</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
