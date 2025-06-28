@@ -98,8 +98,78 @@
                             </div>
                             <div class="card-body">
                                 <p>Send messages to multiple contacts at once. Upload a CSV file or enter numbers manually.</p>
-                                <div class="alert alert-info">
-                                    <strong>Coming Soon:</strong> Bulk messaging functionality will be available in the next update.
+                                
+                                <!-- Bulk Messaging Options -->
+                                <ul class="nav nav-pills mb-3" id="bulk-options" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="manual-bulk-tab" data-bs-toggle="pill" data-bs-target="#manual-bulk" type="button" role="tab">Manual Entry</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="csv-bulk-tab" data-bs-toggle="pill" data-bs-target="#csv-bulk" type="button" role="tab">CSV Upload</button>
+                                    </li>
+                                </ul>
+                                
+                                <div class="tab-content" id="bulk-tab-content">
+                                    <!-- Manual Bulk Entry -->
+                                    <div class="tab-pane fade show active" id="manual-bulk" role="tabpanel">
+                                        <form id="manual-bulk-form">
+                                            <div class="mb-3">
+                                                <label for="bulk-contacts" class="form-label">Phone Numbers</label>
+                                                <textarea class="form-control" id="bulk-contacts" rows="5" placeholder="Enter phone numbers, one per line:&#10;+1234567890&#10;+0987654321&#10;..." required></textarea>
+                                                <small class="form-text text-muted">Enter one phone number per line (with country code)</small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bulk-message" class="form-label">Message</label>
+                                                <textarea class="form-control" id="bulk-message" rows="4" placeholder="Your message here..." required></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bulk-delay" class="form-label">Delay Between Messages (seconds)</label>
+                                                <input type="number" class="form-control" id="bulk-delay" value="2" min="1" max="10">
+                                                <small class="form-text text-muted">Delay to avoid being flagged as spam</small>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">Send Bulk Messages</button>
+                                        </form>
+                                    </div>
+                                    
+                                    <!-- CSV Upload -->
+                                    <div class="tab-pane fade" id="csv-bulk" role="tabpanel">
+                                        <form id="csv-bulk-form" enctype="multipart/form-data">
+                                            <div class="mb-3">
+                                                <label for="csv-file" class="form-label">CSV File</label>
+                                                <input type="file" class="form-control" id="csv-file" accept=".csv" required>
+                                                <small class="form-text text-muted">CSV should have columns: name, phone, email (optional)</small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="csv-message" class="form-label">Message</label>
+                                                <textarea class="form-control" id="csv-message" rows="4" placeholder="Your message here..." required></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="csv-delay" class="form-label">Delay Between Messages (seconds)</label>
+                                                <input type="number" class="form-control" id="csv-delay" value="2" min="1" max="10">
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">Send from CSV</button>
+                                        </form>
+                                        
+                                        <div class="mt-3">
+                                            <h6>CSV Format Example:</h6>
+                                            <pre class="bg-light p-2 rounded"><code>name,phone,email
+John Doe,+1234567890,john@example.com
+Jane Smith,+0987654321,jane@example.com</code></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Results Display -->
+                                <div id="bulk-results" class="mt-4" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Bulk Messaging Results</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="bulk-summary" class="mb-3"></div>
+                                            <div id="bulk-details"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
