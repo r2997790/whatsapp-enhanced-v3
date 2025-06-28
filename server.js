@@ -9,6 +9,7 @@ const whatsappModule = require('./modules/whatsapp');
 const bulkModule = require('./modules/bulk-messaging');
 const templatesModule = require('./modules/templates');
 const contactsModule = require('./modules/contacts');
+const personalizationModule = require('./modules/personalization');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,6 +63,15 @@ app.delete('/api/groups/:id', contactsModule.deleteGroup);
 app.get('/api/groups/:id/contacts', contactsModule.getGroupContacts);
 app.post('/api/groups/:groupId/contacts/:contactId', contactsModule.addContactToGroup);
 app.delete('/api/groups/:groupId/contacts/:contactId', contactsModule.removeContactFromGroup);
+
+// Personalization routes
+app.get('/api/personalization/tokens', personalizationModule.getSuggestedTokens);
+app.post('/api/personalization/personalize', personalizationModule.personalizeMessage);
+app.post('/api/personalization/previews', personalizationModule.generatePreviews);
+app.post('/api/personalization/bulk-send', personalizationModule.sendPersonalizedBulk);
+app.post('/api/personalization/group-send', personalizationModule.sendPersonalizedGroup);
+app.post('/api/personalization/validate', personalizationModule.validateTokens);
+app.post('/api/personalization/extract-tokens', personalizationModule.extractTokens);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
