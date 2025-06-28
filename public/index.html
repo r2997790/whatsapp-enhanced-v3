@@ -7,11 +7,13 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        .feature-card {
+        .feature-card, .template-card, .contact-card, .group-card {
             transition: transform 0.2s;
+            cursor: pointer;
         }
-        .feature-card:hover {
-            transform: translateY(-5px);
+        .feature-card:hover, .template-card:hover, .contact-card:hover, .group-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         .qr-container {
             text-align: center;
@@ -30,14 +32,6 @@
         .status-authenticated { background-color: #198754; }
         .status-ready { background-color: #198754; }
         .status-error { background-color: #dc3545; }
-        .template-card {
-            transition: transform 0.2s;
-            cursor: pointer;
-        }
-        .template-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
         .connection-controls {
             margin-top: 15px;
         }
@@ -59,6 +53,15 @@
             font-size: 0.875rem;
             max-height: 200px;
             overflow-y: auto;
+        }
+        .contact-card .card-body {
+            position: relative;
+        }
+        .contact-avatar, .group-icon {
+            text-align: center;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: 600;
         }
     </style>
 </head>
@@ -279,14 +282,79 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
                     <!-- Contacts Tab -->
                     <div class="tab-pane fade" id="contacts" role="tabpanel">
                         <div class="card mt-3">
-                            <div class="card-header">
+                            <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">Contact Management</h5>
+                                <div>
+                                    <button class="btn btn-success btn-sm me-2" id="add-contact-btn">
+                                        <i class="bi bi-person-plus"></i> Add Contact
+                                    </button>
+                                    <button class="btn btn-info btn-sm" id="import-contacts-btn">
+                                        <i class="bi bi-upload"></i> Import CSV
+                                    </button>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <p>Manage your contacts and groups for easy messaging.</p>
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle"></i>
-                                    <strong>Coming in Step 3:</strong> Contact management features will be implemented next.
+                                
+                                <!-- Contact Management Navigation -->
+                                <ul class="nav nav-pills mb-3" id="contact-options" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="contacts-list-tab" data-bs-toggle="pill" data-bs-target="#contacts-section" type="button" role="tab">
+                                            <i class="bi bi-people"></i> Contacts
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="groups-list-tab" data-bs-toggle="pill" data-bs-target="#groups-section" type="button" role="tab">
+                                            <i class="bi bi-collection"></i> Groups
+                                        </button>
+                                    </li>
+                                </ul>
+                                
+                                <div class="tab-content" id="contact-tab-content">
+                                    <!-- Contacts Section -->
+                                    <div class="tab-pane fade show active" id="contacts-section" role="tabpanel">
+                                        <!-- Search and Filter -->
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <input type="text" class="form-control" id="contact-search" placeholder="Search contacts...">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <select class="form-select" id="contact-tag-filter">
+                                                    <option value="">All Tags</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Contacts List -->
+                                        <div id="contacts-list" class="row">
+                                            <div class="col-12 text-center py-4">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Loading contacts...</span>
+                                                </div>
+                                                <p class="mt-2 text-muted">Loading contacts...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Groups Section -->
+                                    <div class="tab-pane fade" id="groups-section" role="tabpanel">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6 class="mb-0">Contact Groups</h6>
+                                            <button class="btn btn-primary btn-sm" id="create-group-btn">
+                                                <i class="bi bi-plus-circle"></i> Create Group
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Groups List -->
+                                        <div id="groups-list" class="row">
+                                            <div class="col-12 text-center py-4">
+                                                <div class="spinner-border text-success" role="status">
+                                                    <span class="visually-hidden">Loading groups...</span>
+                                                </div>
+                                                <p class="mt-2 text-muted">Loading groups...</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -355,31 +423,105 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
         </div>
     </div>
 
-    <!-- Use Template Modal -->
-    <div class="modal fade" id="use-template-modal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <!-- Contact Modals -->
+    <!-- Add/Edit Contact Modal -->
+    <div class="modal fade" id="contact-form-modal" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Use Template</h5>
+                    <h5 class="modal-title" id="contact-form-title">Add Contact</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="template-variables-form">
-                        <!-- Variable inputs will be generated here -->
-                    </div>
-                    <div class="mt-3">
-                        <label class="form-label">Preview:</label>
-                        <div id="template-message-preview" class="alert alert-light border"></div>
-                    </div>
-                    <div class="mt-3">
-                        <label for="template-recipient" class="form-label">Send to:</label>
-                        <input type="text" class="form-control" id="template-recipient" placeholder="+1234567890">
-                    </div>
+                    <form id="contact-form">
+                        <input type="hidden" id="contact-id">
+                        <div class="mb-3">
+                            <label for="contact-name" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="contact-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="contact-phone" class="form-label">Phone Number *</label>
+                            <input type="tel" class="form-control" id="contact-phone" placeholder="+1234567890" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="contact-email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="contact-email" placeholder="contact@example.com">
+                        </div>
+                        <div class="mb-3">
+                            <label for="contact-tags" class="form-label">Tags</label>
+                            <input type="text" class="form-control" id="contact-tags" placeholder="family, work, client">
+                            <small class="form-text text-muted">Separate multiple tags with commas</small>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="send-template-btn">
-                        <i class="bi bi-send"></i> Send Message
+                    <button type="button" class="btn btn-primary" id="save-contact-btn">
+                        <i class="bi bi-check-circle"></i> Save Contact
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Contacts Modal -->
+    <div class="modal fade" id="import-contacts-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Contacts</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="import-form" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="import-file" class="form-label">CSV File</label>
+                            <input type="file" class="form-control" id="import-file" accept=".csv" required>
+                            <small class="form-text text-muted">CSV should have columns: name, phone, email, tags</small>
+                        </div>
+                        <div class="mt-3">
+                            <h6>CSV Format Example:</h6>
+                            <pre class="bg-light p-2 rounded"><code>name,phone,email,tags
+John Doe,+1234567890,john@example.com,"family,friend"
+Jane Smith,+0987654321,jane@example.com,"work,client"</code></pre>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="import-contacts-btn-modal">
+                        <i class="bi bi-upload"></i> Import Contacts
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Group Modal -->
+    <div class="modal fade" id="group-form-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="group-form-title">Create Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="group-form">
+                        <input type="hidden" id="group-id">
+                        <div class="mb-3">
+                            <label for="group-name" class="form-label">Group Name *</label>
+                            <input type="text" class="form-control" id="group-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="group-description" class="form-label">Description</label>
+                            <textarea class="form-control" id="group-description" rows="3" placeholder="Optional group description"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-group-btn">
+                        <i class="bi bi-check-circle"></i> Save Group
                     </button>
                 </div>
             </div>
@@ -389,6 +531,7 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/template-manager.js"></script>
+    <script src="js/contact-manager.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
