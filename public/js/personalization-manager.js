@@ -174,116 +174,6 @@ class PersonalizationManager {
         this.updatePersonalizationStats();
     }
 
-    // Show personalized message modal
-    showPersonalizedMessageModal() {
-        this.app.debugLog('Opening personalized message modal');
-        
-        const modal = new bootstrap.Modal(document.getElementById('personalized-message-modal'));
-        
-        // Load contacts for selection
-        this.loadContactsForPersonalization();
-        
-        modal.show();
-    }
-
-    // Show bulk personalized modal
-    showBulkPersonalizedModal() {
-        this.app.debugLog('Opening bulk personalized message modal');
-        
-        const modal = new bootstrap.Modal(document.getElementById('bulk-personalized-modal'));
-        
-        // Load groups for selection
-        this.loadGroupsForPersonalization();
-        
-        modal.show();
-    }
-
-    // Load contacts for personalization dropdown
-    async loadContactsForPersonalization() {
-        const select = document.getElementById('personalization-contact');
-        if (!select) return;
-        
-        if (this.app.contactManager && this.app.contactManager.contacts) {
-            const contacts = this.app.contactManager.contacts;
-            
-            select.innerHTML = '<option value="">Select a contact...</option>';
-            contacts.forEach(contact => {
-                const option = document.createElement('option');
-                option.value = contact.id;
-                option.textContent = `${contact.name} (${contact.phone})`;
-                select.appendChild(option);
-            });
-        }
-    }
-
-    // Load groups for personalization
-    async loadGroupsForPersonalization() {
-        const select = document.getElementById('bulk-personalization-group');
-        if (!select) return;
-        
-        if (this.app.contactManager && this.app.contactManager.groups) {
-            const groups = this.app.contactManager.groups;
-            
-            select.innerHTML = '<option value="">Select a group...</option><option value="all">All Contacts</option>';
-            groups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = `${group.name} (${group.contactCount || 0} contacts)`;
-                select.appendChild(option);
-            });
-        }
-    }
-
-    // Generate bulk preview
-    async generateBulkPreview() {
-        const groupSelect = document.getElementById('bulk-personalization-group');
-        const messageTextarea = document.getElementById('bulk-personalization-message');
-        const previewDiv = document.getElementById('bulk-personalization-preview');
-        const limitInput = document.getElementById('bulk-preview-limit');
-        
-        if (!groupSelect || !messageTextarea || !previewDiv) return;
-        
-        const groupId = groupSelect.value;
-        const template = messageTextarea.value;
-        const limit = parseInt(limitInput?.value) || 3;
-        
-        if (!groupId || !template) {
-            previewDiv.innerHTML = '<em class="text-muted">Select contacts and enter a message to see preview</em>';
-            return;
-        }
-        
-        let contacts = [];
-        
-        if (groupId === 'all') {
-            contacts = this.app.contactManager?.contacts?.slice(0, limit) || [];
-        } else {
-            // For now, show first few contacts (group contact loading would be implemented)
-            contacts = this.app.contactManager?.contacts?.slice(0, limit) || [];
-        }
-        
-        if (contacts.length === 0) {
-            previewDiv.innerHTML = '<em class="text-warning">No contacts found</em>';
-            return;
-        }
-        
-        const previews = contacts.map(contact => {
-            const personalizedMessage = this.personalizeMessage(template, contact);
-            return `
-                <div class="border p-2 mb-2 bg-light">
-                    <strong>${this.escapeHtml(contact.name)} (${this.escapeHtml(contact.phone)}):</strong><br>
-                    ${this.escapeHtml(personalizedMessage)}
-                </div>
-            `;
-        }).join('');
-        
-        const totalContacts = this.app.contactManager?.contacts?.length || 0;
-        previewDiv.innerHTML = `
-            <strong>Preview for ${contacts.length} contacts:</strong>
-            ${previews}
-            ${contacts.length < totalContacts ? '<em class="text-muted">...and more</em>' : ''}
-        `;
-    }
-
     // Handle recipient type change
     onRecipientTypeChange() {
         const recipientType = document.getElementById('personalization-recipient-type').value;
@@ -323,6 +213,130 @@ class PersonalizationManager {
                 break;
         }
 
+        this.updatePersonalizationStats();
+    }
+
+    // Load single contact options
+    loadSingleContactOptions() {
+        const select = document.getElementById('personalization-recipients');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Select a contact...</option>';
+        
+        if (this.app.contactManager && this.app.contactManager.contacts) {
+            this.app.contactManager.contacts.forEach(contact => {
+                const option = document.createElement('option');
+                option.value = contact.id;
+                option.textContent = `${contact.name} (${contact.phone})`;
+                select.appendChild(option);
+            });
+        }
+
+        select.onchange = () => {
+            const contactId = select.value;
+            if (contactId) {
+                const contact = this.app.contactManager.contacts.find(c => c.id === contactId);
+                this.selectedContacts = contact ? [contact] : [];
+            } else {
+                this.selectedContacts = [];
+            }
+            this.generatePersonalizedPreview();
+            const sendBtn = document.getElementById('send-personalized-btn');
+            if (sendBtn) sendBtn.disabled = this.selectedContacts.length === 0;
+            this.updatePersonalizationStats();
+        };
+    }
+
+    // Load group options
+    loadGroupOptions() {
+        const select = document.getElementById('personalization-recipients');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Select a group...</option>';
+        
+        if (this.app.contactManager && this.app.contactManager.groups) {
+            this.app.contactManager.groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = `${group.name} (${group.contactCount || 0} contacts)`;
+                select.appendChild(option);
+            });
+        }
+
+        select.onchange = async () => {
+            const groupId = select.value;
+            if (groupId) {
+                try {
+                    const response = await fetch(`/api/groups/${groupId}/contacts`);
+                    const result = await response.json();
+                    this.selectedContacts = result.success ? result.contacts : [];
+                } catch (error) {
+                    this.app.debugLog(`Error loading group contacts: ${error.message}`);
+                    this.selectedContacts = [];
+                }
+            } else {
+                this.selectedContacts = [];
+            }
+            this.generatePersonalizedPreview();
+            const sendBtn = document.getElementById('send-personalized-btn');
+            if (sendBtn) sendBtn.disabled = this.selectedContacts.length === 0;
+            this.updatePersonalizationStats();
+        };
+    }
+
+    // Load multiple contact selection
+    loadMultipleContactSelection() {
+        const container = document.getElementById('personalization-contact-list');
+        if (!container) return;
+
+        if (!this.app.contactManager || !this.app.contactManager.contacts) {
+            container.innerHTML = '<em class="text-muted">No contacts available</em>';
+            return;
+        }
+
+        container.innerHTML = this.app.contactManager.contacts.map(contact => `
+            <div class="contact-item" onclick="app.personalizationManager.toggleContactSelection('${contact.id}')">
+                <input type="checkbox" id="contact-${contact.id}" class="form-check-input me-2">
+                <strong>${this.escapeHtml(contact.name)}</strong>
+                <small class="text-muted">${this.escapeHtml(contact.phone)}</small>
+                ${contact.company ? `<br><small class="text-info">${this.escapeHtml(contact.company)}</small>` : ''}
+            </div>
+        `).join('');
+    }
+
+    // Toggle contact selection for multiple contacts
+    toggleContactSelection(contactId) {
+        const checkbox = document.getElementById(`contact-${contactId}`);
+        const contactItem = checkbox.parentElement;
+        
+        if (checkbox.checked) {
+            // Unselect
+            checkbox.checked = false;
+            contactItem.classList.remove('selected');
+            this.selectedContacts = this.selectedContacts.filter(c => c.id !== contactId);
+        } else {
+            // Select
+            checkbox.checked = true;
+            contactItem.classList.add('selected');
+            const contact = this.app.contactManager.contacts.find(c => c.id === contactId);
+            if (contact) {
+                this.selectedContacts.push(contact);
+            }
+        }
+
+        // Update counter
+        const counter = document.getElementById('selected-contacts-count');
+        if (counter) {
+            counter.textContent = this.selectedContacts.length;
+        }
+
+        // Update send button
+        const sendBtn = document.getElementById('send-personalized-btn');
+        if (sendBtn) {
+            sendBtn.disabled = this.selectedContacts.length === 0;
+        }
+
+        this.generatePersonalizedPreview();
         this.updatePersonalizationStats();
     }
 
@@ -384,6 +398,215 @@ class PersonalizationManager {
         } catch (error) {
             this.app.debugLog(`Personalized send error: ${error.message}`);
             this.app.showNotification('error', 'Network Error', 'Failed to send personalized messages');
+        }
+    }
+
+    // Show personalized message modal
+    showPersonalizedMessageModal() {
+        this.app.debugLog('Opening personalized message modal');
+        
+        const modal = new bootstrap.Modal(document.getElementById('personalized-message-modal'));
+        
+        // Load contacts for selection
+        this.loadContactsForPersonalization();
+        
+        modal.show();
+    }
+
+    // Show bulk personalized modal
+    showBulkPersonalizedModal() {
+        this.app.debugLog('Opening bulk personalized message modal');
+        
+        const modal = new bootstrap.Modal(document.getElementById('bulk-personalized-modal'));
+        
+        // Load groups for selection
+        this.loadGroupsForPersonalization();
+        
+        modal.show();
+    }
+
+    // Load contacts for personalization dropdown
+    async loadContactsForPersonalization() {
+        const select = document.getElementById('personalization-contact');
+        if (!select) return;
+        
+        if (this.app.contactManager && this.app.contactManager.contacts) {
+            const contacts = this.app.contactManager.contacts;
+            
+            select.innerHTML = '<option value="">Select a contact...</option>';
+            contacts.forEach(contact => {
+                const option = document.createElement('option');
+                option.value = contact.id;
+                option.textContent = `${contact.name} (${contact.phone})`;
+                select.appendChild(option);
+            });
+        }
+    }
+
+    // Load groups for personalization
+    async loadGroupsForPersonalization() {
+        const select = document.getElementById('bulk-personalization-group');
+        if (!select) return;
+        
+        if (this.app.contactManager && this.app.contactManager.groups) {
+            const groups = this.app.contactManager.groups;
+            
+            select.innerHTML = '<option value="">Select a group...</option><option value="all">All Contacts</option>';
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = `${group.name} (${group.contactCount || 0} contacts)`;
+                select.appendChild(option);
+            });
+        }
+    }
+
+    // Send personalized message from modal
+    async sendPersonalizedMessage() {
+        const contactSelect = document.getElementById('personalization-contact');
+        const phoneInput = document.getElementById('personalization-phone-manual');
+        const messageTextarea = document.getElementById('personalization-message');
+        
+        if (!messageTextarea) return;
+        
+        // Get phone number
+        let phoneNumber = '';
+        if (contactSelect && contactSelect.value) {
+            const contact = this.app.contactManager?.contacts?.find(c => c.id === contactSelect.value);
+            phoneNumber = contact ? contact.phone : '';
+        } else if (phoneInput) {
+            phoneNumber = phoneInput.value.trim();
+        }
+        
+        if (!phoneNumber) {
+            this.app.showNotification('error', 'Validation Error', 'Please select a contact or enter a phone number');
+            return;
+        }
+
+        const template = messageTextarea.value.trim();
+        if (!template) {
+            this.app.showNotification('error', 'Validation Error', 'Please enter a message');
+            return;
+        }
+
+        const contact = this.app.contactManager?.contacts?.find(c => c.phone === phoneNumber) || { phone: phoneNumber, name: phoneNumber };
+        const personalizedMessage = this.personalizeMessage(template, contact);
+
+        try {
+            const response = await fetch('/api/send-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    number: phoneNumber, 
+                    message: personalizedMessage 
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.app.showNotification('success', 'Message Sent', 'Personalized message sent successfully');
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('personalized-message-modal'));
+                modal.hide();
+                
+                // Reset form
+                document.getElementById('personalized-form').reset();
+                document.getElementById('personalization-preview').innerHTML = '<em class="text-muted">Select a contact and enter a message to see preview</em>';
+            } else {
+                this.app.showNotification('error', 'Send Failed', result.message);
+            }
+        } catch (error) {
+            this.app.debugLog(`Personalized message send error: ${error.message}`);
+            this.app.showNotification('error', 'Network Error', 'Failed to send personalized message');
+        }
+    }
+
+    // Send bulk personalized messages
+    async sendBulkPersonalized() {
+        const groupSelect = document.getElementById('bulk-personalization-group');
+        const messageTextarea = document.getElementById('bulk-personalization-message');
+        const delayInput = document.getElementById('bulk-personalization-delay');
+        
+        if (!groupSelect || !messageTextarea) return;
+        
+        const groupId = groupSelect.value;
+        const template = messageTextarea.value.trim();
+        const delay = parseInt(delayInput?.value) || 2;
+        
+        if (!groupId) {
+            this.app.showNotification('error', 'Validation Error', 'Please select a contact group');
+            return;
+        }
+        
+        if (!template) {
+            this.app.showNotification('error', 'Validation Error', 'Please enter a message template');
+            return;
+        }
+        
+        let contacts = [];
+        
+        if (groupId === 'all') {
+            contacts = this.app.contactManager?.contacts || [];
+        } else {
+            // Load group contacts
+            try {
+                const response = await fetch(`/api/groups/${groupId}/contacts`);
+                const result = await response.json();
+                contacts = result.success ? result.contacts : [];
+            } catch (error) {
+                this.app.debugLog(`Error loading group contacts: ${error.message}`);
+                this.app.showNotification('error', 'Error', 'Failed to load group contacts');
+                return;
+            }
+        }
+        
+        if (contacts.length === 0) {
+            this.app.showNotification('error', 'No Contacts', 'No contacts found to send messages to');
+            return;
+        }
+        
+        // Confirm bulk send
+        if (!confirm(`Send personalized messages to ${contacts.length} contacts?`)) {
+            return;
+        }
+        
+        try {
+            // Prepare personalized messages
+            const personalizedMessages = contacts.map(contact => ({
+                number: contact.phone,
+                message: this.personalizeMessage(template, contact),
+                contactName: contact.name
+            }));
+            
+            const response = await fetch('/api/personalization/bulk-send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: personalizedMessages,
+                    delay: delay * 1000
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.app.showNotification('success', 'Bulk Send Started', `Personalized messages queued for ${contacts.length} contacts`);
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('bulk-personalized-modal'));
+                modal.hide();
+                
+                // Reset form
+                document.getElementById('bulk-personalized-form').reset();
+                document.getElementById('bulk-personalization-preview').innerHTML = '<em class="text-muted">Select contacts and enter a message to see preview</em>';
+            } else {
+                this.app.showNotification('error', 'Bulk Send Failed', result.message);
+            }
+        } catch (error) {
+            this.app.debugLog(`Bulk personalized send error: ${error.message}`);
+            this.app.showNotification('error', 'Network Error', 'Failed to send bulk personalized messages');
         }
     }
 
