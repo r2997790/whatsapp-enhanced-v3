@@ -63,6 +63,13 @@
         .nav-tabs .nav-link.active {
             font-weight: 600;
         }
+        .suggested-token {
+            transition: all 0.2s ease;
+        }
+        .suggested-token:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -363,14 +370,62 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
                     <!-- Personalization Tab -->
                     <div class="tab-pane fade" id="personalization" role="tabpanel">
                         <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="mb-0">Personalization Tokens</h5>
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Personalization & Message Templates</h5>
+                                <div>
+                                    <button class="btn btn-success btn-sm me-2" onclick="app.personalizationManager.showPersonalizedMessageModal()">
+                                        <i class="bi bi-person-check"></i> Send Personalized
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" onclick="app.personalizationManager.showBulkPersonalizedModal()">
+                                        <i class="bi bi-people-fill"></i> Bulk Personalized
+                                    </button>
+                                </div>
                             </div>
                             <div class="card-body">
-                                <p>Use personalization tokens like {{name}}, {{company}} to customize messages.</p>
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle"></i>
-                                    <strong>Coming in Step 4:</strong> Personalization features will be implemented after contacts.
+                                <div class="row">
+                                    <!-- Left Column: Tokens and Instructions -->
+                                    <div class="col-md-6">
+                                        <h6>Available Tokens</h6>
+                                        <p class="text-muted">Click any token to insert it into your message. Use personalization tokens like {{name}}, {{company}} to customize messages for each contact.</p>
+                                        
+                                        <div class="mb-3">
+                                            <strong>Suggested Tokens:</strong>
+                                            <div id="suggested-tokens" class="mt-2">
+                                                <span class="badge bg-info me-1 mb-1">Loading...</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i>
+                                            <strong>How to use:</strong>
+                                            <ul class="mb-0 mt-2">
+                                                <li>Click a token to insert it into your message</li>
+                                                <li>Tokens will be replaced with actual contact data</li>
+                                                <li>Use {{date}} and {{time}} for current date/time</li>
+                                                <li>Preview your message before sending</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Right Column: Quick Actions -->
+                                    <div class="col-md-6">
+                                        <h6>Quick Actions</h6>
+                                        
+                                        <div class="d-grid gap-2">
+                                            <button class="btn btn-outline-primary" onclick="app.personalizationManager.showPersonalizedMessageModal()">
+                                                <i class="bi bi-envelope-plus"></i> Create Personalized Message
+                                            </button>
+                                            
+                                            <button class="btn btn-outline-success" onclick="app.personalizationManager.showBulkPersonalizedModal()">
+                                                <i class="bi bi-send-plus"></i> Send to Multiple Contacts
+                                            </button>
+                                        </div>
+                                        
+                                        <hr>
+                                        
+                                        <h6>Template Integration</h6>
+                                        <p class="text-muted small">Templates with variables will show "Use Template" buttons that open personalization options.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -380,51 +435,7 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
         </div>
     </div>
 
-    <!-- Template Modals -->
-    <!-- Create/Edit Template Modal -->
-    <div class="modal fade" id="template-form-modal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="template-form-title">Create Template</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="template-form">
-                        <input type="hidden" id="template-id">
-                        <div class="mb-3">
-                            <label for="template-name" class="form-label">Template Name</label>
-                            <input type="text" class="form-control" id="template-name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="template-category" class="form-label">Category</label>
-                            <input type="text" class="form-control" id="template-category" placeholder="e.g., marketing, appointments, general">
-                        </div>
-                        <div class="mb-3">
-                            <label for="template-content" class="form-label">Message Content</label>
-                            <textarea class="form-control" id="template-content" rows="6" placeholder="Use {{variable}} for personalization, e.g., Hi {{name}}, your appointment is on {{date}}." required></textarea>
-                            <small class="form-text text-muted">Use {{variableName}} for personalization tokens</small>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Variables Detected:</label>
-                            <div id="detected-variables" class="alert alert-info">
-                                Type in the content area to detect variables
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-template-btn">
-                        <i class="bi bi-check-circle"></i> Save Template
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contact Modals -->
-    <!-- Add/Edit Contact Modal -->
+    <!-- Contact Form Modal -->
     <div class="modal fade" id="contact-form-modal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -464,74 +475,11 @@ Jane Smith,+0987654321,jane@example.com</code></pre>
         </div>
     </div>
 
-    <!-- Import Contacts Modal -->
-    <div class="modal fade" id="import-contacts-modal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Import Contacts</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="import-form" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label for="import-file" class="form-label">CSV File</label>
-                            <input type="file" class="form-control" id="import-file" accept=".csv" required>
-                            <small class="form-text text-muted">CSV should have columns: name, phone, email, tags</small>
-                        </div>
-                        <div class="mt-3">
-                            <h6>CSV Format Example:</h6>
-                            <pre class="bg-light p-2 rounded"><code>name,phone,email,tags
-John Doe,+1234567890,john@example.com,"family,friend"
-Jane Smith,+0987654321,jane@example.com,"work,client"</code></pre>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="import-contacts-btn-modal">
-                        <i class="bi bi-upload"></i> Import Contacts
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Create/Edit Group Modal -->
-    <div class="modal fade" id="group-form-modal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="group-form-title">Create Group</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="group-form">
-                        <input type="hidden" id="group-id">
-                        <div class="mb-3">
-                            <label for="group-name" class="form-label">Group Name *</label>
-                            <input type="text" class="form-control" id="group-name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="group-description" class="form-label">Description</label>
-                            <textarea class="form-control" id="group-description" rows="3" placeholder="Optional group description"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-group-btn">
-                        <i class="bi bi-check-circle"></i> Save Group
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="js/template-manager.js"></script>
     <script src="js/contact-manager.js"></script>
+    <script src="js/personalization-manager.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
