@@ -519,6 +519,15 @@ class WhatsAppEnhanced {
             });
         }
 
+        // Personalization input listeners
+        const personalizationMessage = document.getElementById('personalization-message');
+        if (personalizationMessage) {
+            personalizationMessage.addEventListener('input', () => {
+                this.personalizationManager.generatePersonalizedPreview();
+                this.personalizationManager.updatePersonalizationStats();
+            });
+        }
+
         // Tab change listeners
         document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
             tab.addEventListener('shown.bs.tab', (e) => {
@@ -531,6 +540,7 @@ class WhatsAppEnhanced {
                 } else if (target === '#personalization') {
                     this.personalizationManager.loadSuggestedTokens();
                     this.personalizationManager.displaySuggestedTokens();
+                    this.personalizationManager.loadTemplatesForSelector();
                 }
             });
         });
@@ -542,8 +552,11 @@ class WhatsAppEnhanced {
         try {
             this.debugLog('Loading initial data...');
             await this.templateManager.loadTemplates();
+            await this.contactManager.loadContacts();
+            await this.contactManager.loadGroups();
             await this.personalizationManager.loadSuggestedTokens();
             this.personalizationManager.displaySuggestedTokens();
+            this.personalizationManager.loadTemplatesForSelector();
             this.debugLog('Initial data loaded');
         } catch (error) {
             this.debugLog(`Error loading initial data: ${error.message}`);
