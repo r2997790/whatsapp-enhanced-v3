@@ -1,474 +1,195 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Enhanced v3</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        .feature-card, .template-card, .contact-card, .group-card {
-            transition: transform 0.2s;
-            cursor: pointer;
-        }
-        .feature-card:hover, .template-card:hover, .contact-card:hover, .group-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .qr-container {
-            text-align: center;
-            padding: 20px;
-        }
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-        }
-        .status-disconnected { background-color: #dc3545; }
-        .status-connecting { background-color: #ffc107; animation: pulse 1s infinite; }
-        .status-qr_ready { background-color: #ffc107; }
-        .status-authenticated { background-color: #198754; }
-        .status-ready { background-color: #198754; }
-        .status-error { background-color: #dc3545; }
-        .connection-controls {
-            margin-top: 15px;
-        }
-        .btn-connect {
-            margin-right: 10px;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .debug-info {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            padding: 0.75rem;
-            margin-top: 1rem;
-            font-family: monospace;
-            font-size: 0.875rem;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .contact-card .card-body {
-            position: relative;
-        }
-        .contact-avatar, .group-icon {
-            text-align: center;
-        }
-        .nav-tabs .nav-link.active {
-            font-weight: 600;
-        }
-        .suggested-token {
-            transition: all 0.2s ease;
-        }
-        .suggested-token:hover {
-            transform: scale(1.05);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-    </style>
-</head>
-<body>
-    <div class="container mt-4">
-        <div class="row">
-            <div class="col-12">
-                <h1 class="text-center mb-4">WhatsApp Enhanced v3</h1>
-                
-                <!-- Status Section -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Connection Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="status-display">
-                            <span class="status-indicator status-disconnected"></span>
-                            <span id="status-text">Disconnected</span>
-                            <span id="client-count" class="text-muted ms-2" style="display: none;"></span>
-                        </div>
-                        
-                        <!-- Connection Controls -->
-                        <div class="connection-controls">
-                            <button id="connect-btn" class="btn btn-success btn-connect" title="Connect to WhatsApp">
-                                <i class="bi bi-play-fill"></i> Connect
-                            </button>
-                            <button id="reconnect-btn" class="btn btn-warning btn-connect" style="display: none;" title="Reconnect to WhatsApp">
-                                <i class="bi bi-arrow-clockwise"></i> Reconnect
-                            </button>
-                            <button id="disconnect-btn" class="btn btn-danger btn-connect" style="display: none;" title="Disconnect from WhatsApp">
-                                <i class="bi bi-stop-fill"></i> Disconnect
-                            </button>
-                            <button id="refresh-qr-btn" class="btn btn-info btn-connect" style="display: none;" title="Refresh QR Code">
-                                <i class="bi bi-arrow-clockwise"></i> Refresh QR
-                            </button>
-                        </div>
-                        
-                        <!-- Debug Info -->
-                        <div id="debug-info" class="debug-info" style="display: none;">
-                            <strong>Debug Info:</strong><br>
-                            <span id="debug-text">Loading...</span>
-                        </div>
-                        
-                        <!-- Loading Status -->
-                        <div id="loading-status" class="mt-3" style="display: none;">
-                            <div class="progress">
-                                <div id="loading-progress" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
-                            </div>
-                            <small id="loading-message" class="text-muted">Initializing...</small>
-                        </div>
-                        
-                        <div id="qr-container" class="qr-container" style="display: none;">
-                            <h6>Scan QR Code with WhatsApp</h6>
-                            <img id="qr-image" src="" alt="QR Code" class="img-fluid">
-                            <div class="mt-2">
-                                <small class="text-muted">Open WhatsApp on your phone → Settings → Linked Devices → Link a Device</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Send Message -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Quick Send Message</h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="quick-send-form">
-                            <div class="mb-3">
-                                <label for="phone-number" class="form-label">Phone Number</label>
-                                <input type="text" class="form-control" id="phone-number" placeholder="+1234567890" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="message" class="form-label">Message</label>
-                                <textarea class="form-control" id="message" rows="3" placeholder="Your message here..." required></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Send Message</button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Navigation Tabs -->
-                <ul class="nav nav-tabs" id="feature-tabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk-messaging" type="button" role="tab">Bulk Messaging</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates" type="button" role="tab">Templates</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="contacts-tab" data-bs-toggle="tab" data-bs-target="#contacts" type="button" role="tab">Contacts</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="personalization-tab" data-bs-toggle="tab" data-bs-target="#personalization" type="button" role="tab">Personalization</button>
-                    </li>
-                </ul>
-
-                <!-- Tab Content -->
-                <div class="tab-content" id="feature-tab-content">
-                    <!-- Bulk Messaging Tab -->
-                    <div class="tab-pane fade show active" id="bulk-messaging" role="tabpanel">
-                        <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="mb-0">Bulk Messaging</h5>
-                            </div>
-                            <div class="card-body">
-                                <p>Send messages to multiple contacts at once. Upload a CSV file or enter numbers manually.</p>
-                                
-                                <!-- Bulk Messaging Options -->
-                                <ul class="nav nav-pills mb-3" id="bulk-options" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="manual-bulk-tab" data-bs-toggle="pill" data-bs-target="#manual-bulk" type="button" role="tab">Manual Entry</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="csv-bulk-tab" data-bs-toggle="pill" data-bs-target="#csv-bulk" type="button" role="tab">CSV Upload</button>
-                                    </li>
-                                </ul>
-                                
-                                <div class="tab-content" id="bulk-tab-content">
-                                    <!-- Manual Bulk Entry -->
-                                    <div class="tab-pane fade show active" id="manual-bulk" role="tabpanel">
-                                        <form id="manual-bulk-form">
-                                            <div class="mb-3">
-                                                <label for="bulk-contacts" class="form-label">Phone Numbers</label>
-                                                <textarea class="form-control" id="bulk-contacts" rows="5" placeholder="Enter phone numbers, one per line:&#10;+1234567890&#10;+0987654321&#10;..." required></textarea>
-                                                <small class="form-text text-muted">Enter one phone number per line (with country code)</small>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="bulk-message" class="form-label">Message</label>
-                                                <textarea class="form-control" id="bulk-message" rows="4" placeholder="Your message here..." required></textarea>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="bulk-delay" class="form-label">Delay Between Messages (seconds)</label>
-                                                <input type="number" class="form-control" id="bulk-delay" value="2" min="1" max="10">
-                                                <small class="form-text text-muted">Delay to avoid being flagged as spam</small>
-                                            </div>
-                                            <button type="submit" class="btn btn-primary">Send Bulk Messages</button>
-                                        </form>
-                                    </div>
-                                    
-                                    <!-- CSV Upload -->
-                                    <div class="tab-pane fade" id="csv-bulk" role="tabpanel">
-                                        <form id="csv-bulk-form" enctype="multipart/form-data">
-                                            <div class="mb-3">
-                                                <label for="csv-file" class="form-label">CSV File</label>
-                                                <input type="file" class="form-control" id="csv-file" accept=".csv" required>
-                                                <small class="form-text text-muted">CSV should have columns: name, phone, email (optional)</small>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="csv-message" class="form-label">Message</label>
-                                                <textarea class="form-control" id="csv-message" rows="4" placeholder="Your message here..." required></textarea>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="csv-delay" class="form-label">Delay Between Messages (seconds)</label>
-                                                <input type="number" class="form-control" id="csv-delay" value="2" min="1" max="10">
-                                            </div>
-                                            <button type="submit" class="btn btn-primary">Send from CSV</button>
-                                        </form>
-                                        
-                                        <div class="mt-3">
-                                            <h6>CSV Format Example:</h6>
-                                            <pre class="bg-light p-2 rounded"><code>name,phone,email
-John Doe,+1234567890,john@example.com
-Jane Smith,+0987654321,jane@example.com</code></pre>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Results Display -->
-                                <div id="bulk-results" class="mt-4" style="display: none;">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h6 class="mb-0">Bulk Messaging Results</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="bulk-summary" class="mb-3"></div>
-                                            <div id="bulk-details"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Templates Tab -->
-                    <div class="tab-pane fade" id="templates" role="tabpanel">
-                        <div class="card mt-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Message Templates</h5>
-                                <button class="btn btn-primary btn-sm" id="create-template-btn">
-                                    <i class="bi bi-plus-circle"></i> Create New Template
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <p>Create and manage reusable message templates with personalization variables.</p>
-                                
-                                <!-- Template Categories Filter -->
-                                <div class="mb-3">
-                                    <label for="category-filter" class="form-label">Filter by Category:</label>
-                                    <select class="form-select" id="category-filter">
-                                        <option value="">All Categories</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- Templates List -->
-                                <div id="templates-list" class="row">
-                                    <div class="col-12 text-center py-4">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading templates...</span>
-                                        </div>
-                                        <p class="mt-2 text-muted">Loading templates...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Contacts Tab -->
-                    <div class="tab-pane fade" id="contacts" role="tabpanel">
-                        <div class="card mt-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Contact Management</h5>
-                                <div>
-                                    <button class="btn btn-success btn-sm me-2" id="add-contact-btn">
-                                        <i class="bi bi-person-plus"></i> Add Contact
-                                    </button>
-                                    <button class="btn btn-info btn-sm" id="import-contacts-btn">
-                                        <i class="bi bi-upload"></i> Import CSV
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <p>Manage your contacts and groups for easy messaging.</p>
-                                
-                                <!-- Contact Management Navigation -->
-                                <ul class="nav nav-pills mb-3" id="contact-options" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="contacts-list-tab" data-bs-toggle="pill" data-bs-target="#contacts-section" type="button" role="tab">
-                                            <i class="bi bi-people"></i> Contacts
-                                        </button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="groups-list-tab" data-bs-toggle="pill" data-bs-target="#groups-section" type="button" role="tab">
-                                            <i class="bi bi-collection"></i> Groups
-                                        </button>
-                                    </li>
-                                </ul>
-                                
-                                <div class="tab-content" id="contact-tab-content">
-                                    <!-- Contacts Section -->
-                                    <div class="tab-pane fade show active" id="contacts-section" role="tabpanel">
-                                        <!-- Search and Filter -->
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <input type="text" class="form-control" id="contact-search" placeholder="Search contacts...">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <select class="form-select" id="contact-tag-filter">
-                                                    <option value="">All Tags</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Contacts List -->
-                                        <div id="contacts-list" class="row">
-                                            <div class="col-12 text-center py-4">
-                                                <div class="spinner-border text-primary" role="status">
-                                                    <span class="visually-hidden">Loading contacts...</span>
-                                                </div>
-                                                <p class="mt-2 text-muted">Loading contacts...</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Groups Section -->
-                                    <div class="tab-pane fade" id="groups-section" role="tabpanel">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 class="mb-0">Contact Groups</h6>
-                                            <button class="btn btn-primary btn-sm" id="create-group-btn">
-                                                <i class="bi bi-plus-circle"></i> Create Group
-                                            </button>
-                                        </div>
-                                        
-                                        <!-- Groups List -->
-                                        <div id="groups-list" class="row">
-                                            <div class="col-12 text-center py-4">
-                                                <div class="spinner-border text-success" role="status">
-                                                    <span class="visually-hidden">Loading groups...</span>
-                                                </div>
-                                                <p class="mt-2 text-muted">Loading groups...</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Personalization Tab -->
-                    <div class="tab-pane fade" id="personalization" role="tabpanel">
-                        <div class="card mt-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Personalization & Message Templates</h5>
-                                <div>
-                                    <button class="btn btn-success btn-sm me-2" onclick="app.personalizationManager.showPersonalizedMessageModal()">
-                                        <i class="bi bi-person-check"></i> Send Personalized
-                                    </button>
-                                    <button class="btn btn-primary btn-sm" onclick="app.personalizationManager.showBulkPersonalizedModal()">
-                                        <i class="bi bi-people-fill"></i> Bulk Personalized
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <!-- Left Column: Tokens and Instructions -->
-                                    <div class="col-md-6">
-                                        <h6>Available Tokens</h6>
-                                        <p class="text-muted">Click any token to insert it into your message. Use personalization tokens like {{name}}, {{company}} to customize messages for each contact.</p>
-                                        
-                                        <div class="mb-3">
-                                            <strong>Suggested Tokens:</strong>
-                                            <div id="suggested-tokens" class="mt-2">
-                                                <span class="badge bg-info me-1 mb-1">Loading...</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="alert alert-info">
-                                            <i class="bi bi-info-circle"></i>
-                                            <strong>How to use:</strong>
-                                            <ul class="mb-0 mt-2">
-                                                <li>Click a token to insert it into your message</li>
-                                                <li>Tokens will be replaced with actual contact data</li>
-                                                <li>Use {{date}} and {{time}} for current date/time</li>
-                                                <li>Preview your message before sending</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Right Column: Quick Actions -->
-                                    <div class="col-md-6">
-                                        <h6>Quick Actions</h6>
-                                        
-                                        <div class="d-grid gap-2">
-                                            <button class="btn btn-outline-primary" onclick="app.personalizationManager.showPersonalizedMessageModal()">
-                                                <i class="bi bi-envelope-plus"></i> Create Personalized Message
-                                            </button>
-                                            
-                                            <button class="btn btn-outline-success" onclick="app.personalizationManager.showBulkPersonalizedModal()">
-                                                <i class="bi bi-send-plus"></i> Send to Multiple Contacts
-                                            </button>
-                                        </div>
-                                        
-                                        <hr>
-                                        
-                                        <h6>Template Integration</h6>
-                                        <p class="text-muted small">Templates with variables will show "Use Template" buttons that open personalization options.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- Contact Form Modal -->
-    <div class="modal fade" id="contact-form-modal" tabindex="-1">
-        <div class="modal-dialog">
+    <!-- Bulk Personalized Modal -->
+    <div class="modal fade" id="bulk-personalized-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="contact-form-title">Add Contact</h5>
+                    <h5 class="modal-title">Send Bulk Personalized Messages</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="contact-form">
-                        <input type="hidden" id="contact-id">
-                        <div class="mb-3">
-                            <label for="contact-name" class="form-label">Name *</label>
-                            <input type="text" class="form-control" id="contact-name" required>
+                    <form id="bulk-personalized-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="bulk-personalization-group" class="form-label">Select Recipients *</label>
+                                    <select class="form-select" id="bulk-personalization-group" onchange="app.personalizationManager.generateBulkPreview()">
+                                        <option value="">Select contacts...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="bulk-personalization-delay" class="form-label">Delay Between Messages (seconds)</label>
+                                    <input type="number" class="form-control" id="bulk-personalization-delay" value="2" min="1" max="10">
+                                    <small class="form-text text-muted">Delay to avoid being flagged as spam</small>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label for="contact-phone" class="form-label">Phone Number *</label>
-                            <input type="tel" class="form-control" id="contact-phone" placeholder="+1234567890" required>
+                            <label for="bulk-personalization-message" class="form-label">Message Template *</label>
+                            <textarea class="form-control" id="bulk-personalization-message" rows="4" placeholder="Hi {{name}}, we hope you're doing well at {{company}}!" oninput="app.personalizationManager.generateBulkPreview()" required></textarea>
+                            <small class="form-text text-muted">Use {{name}}, {{company}}, {{email}} and other tokens for personalization</small>
                         </div>
                         <div class="mb-3">
-                            <label for="contact-email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="contact-email" placeholder="contact@example.com">
+                            <label class="form-label">Preview Limit</label>
+                            <input type="number" class="form-control" id="bulk-preview-limit" value="3" min="1" max="10" onchange="app.personalizationManager.generateBulkPreview()">
                         </div>
                         <div class="mb-3">
-                            <label for="contact-tags" class="form-label">Tags</label>
-                            <input type="text" class="form-control" id="contact-tags" placeholder="family, work, client">
-                            <small class="form-text text-muted">Separate multiple tags with commas</small>
+                            <label class="form-label">Message Previews</label>
+                            <div id="bulk-personalization-preview" class="p-3 bg-light border rounded" style="max-height: 400px; overflow-y: auto;">
+                                <em class="text-muted">Select contacts and enter a message to see preview</em>
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-contact-btn">
-                        <i class="bi bi-check-circle"></i> Save Contact
+                    <button type="button" class="btn btn-primary" onclick="app.personalizationManager.sendBulkPersonalized()">
+                        <i class="bi bi-send-plus"></i> Send Bulk Messages
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Personalization Modal -->
+    <div class="modal fade" id="template-personalization-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Use Template with Personalization</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Template</label>
+                        <div class="p-2 bg-light border rounded">
+                            <strong id="template-personalization-name">Template Name</strong>
+                        </div>
+                    </div>
+                    <form id="template-personalization-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="template-personalization-contact" class="form-label">Select Contact</label>
+                                    <select class="form-select" id="template-personalization-contact" onchange="app.personalizationManager.autoFillTemplateVariables()">
+                                        <option value="">Manual entry</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="template-personalization-phone" class="form-label">Or enter phone number</label>
+                                    <input type="tel" class="form-control" id="template-personalization-phone" placeholder="+1234567890">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="template-personalization-content" class="form-label">Template Content</label>
+                            <textarea class="form-control" id="template-personalization-content" rows="4" readonly></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Fill Variables</label>
+                            <div id="template-variables-input">
+                                <em class="text-muted">No variables found in this template</em>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Message Preview</label>
+                            <div id="template-personalization-preview" class="p-2 bg-light border rounded">
+                                <em class="text-muted">Fill variables to see preview</em>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="app.personalizationManager.sendTemplatePersonalized()">
+                        <i class="bi bi-send"></i> Send Message
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Import Modal -->
+    <div class="modal fade" id="import-contacts-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Contacts from CSV</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="import-contacts-form" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="import-csv-file" class="form-label">CSV File *</label>
+                            <input type="file" class="form-control" id="import-csv-file" accept=".csv" required>
+                            <small class="form-text text-muted">CSV should have columns: name, phone, email, company, tags</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">CSV Format Example:</label>
+                            <pre class="bg-light p-2 rounded small"><code>name,phone,email,company,tags
+John Doe,+1234567890,john@example.com,Acme Corp,client
+Jane Smith,+0987654321,jane@company.com,Tech Inc,prospect</code></pre>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="overwrite-contacts">
+                            <label class="form-check-label" for="overwrite-contacts">
+                                Overwrite existing contacts with same phone number
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="import-contacts-btn-modal">
+                        <i class="bi bi-upload"></i> Import Contacts
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group Form Modal -->
+    <div class="modal fade" id="group-form-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="group-form-title">Create Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="group-form">
+                        <input type="hidden" id="group-id">
+                        <div class="mb-3">
+                            <label for="group-name" class="form-label">Group Name *</label>
+                            <input type="text" class="form-control" id="group-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="group-description" class="form-label">Description</label>
+                            <textarea class="form-control" id="group-description" rows="3" placeholder="Optional group description..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="group-tags" class="form-label">Tags</label>
+                            <input type="text" class="form-control" id="group-tags" placeholder="marketing, newsletter, vip">
+                            <small class="form-text text-muted">Separate multiple tags with commas</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Select Contacts</label>
+                            <div id="group-contacts-selection" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                <em class="text-muted">Loading contacts...</em>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-group-btn">
+                        <i class="bi bi-check-circle"></i> Save Group
                     </button>
                 </div>
             </div>
