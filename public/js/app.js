@@ -14,6 +14,7 @@ class WhatsAppEnhanced {
         // Initialize managers
         this.templateManager = new TemplateManager(this);
         this.contactManager = new ContactManager(this);
+        this.personalizationManager = new PersonalizationManager(this);
         
         this.initializeSocket();
         this.initializeEventListeners();
@@ -528,8 +529,8 @@ class WhatsAppEnhanced {
                 } else if (target === '#templates') {
                     this.templateManager.loadTemplates();
                 } else if (target === '#personalization') {
-                    this.loadSuggestedTokens();
-                    this.loadGroupsForPersonalization();
+                    this.personalizationManager.loadSuggestedTokens();
+                    this.personalizationManager.displaySuggestedTokens();
                 }
             });
         });
@@ -541,6 +542,8 @@ class WhatsAppEnhanced {
         try {
             this.debugLog('Loading initial data...');
             await this.templateManager.loadTemplates();
+            await this.personalizationManager.loadSuggestedTokens();
+            this.personalizationManager.displaySuggestedTokens();
             this.debugLog('Initial data loaded');
         } catch (error) {
             this.debugLog(`Error loading initial data: ${error.message}`);
@@ -655,10 +658,6 @@ class WhatsAppEnhanced {
             summary.innerHTML = `<strong>Total: ${results.length}</strong>`;
         }
     }
-
-    // Stub functions for personalization functionality
-    loadSuggestedTokens() { this.debugLog('Load suggested tokens - not implemented yet'); }
-    loadGroupsForPersonalization() { this.debugLog('Load groups for personalization - not implemented yet'); }
 }
 
 // Initialize the application
