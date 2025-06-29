@@ -306,6 +306,51 @@ class PersonalizationManager {
         this.updatePersonalizationStats();
     }
 
+    // Generate personalized preview
+    generatePersonalizedPreview() {
+        const messageElement = document.getElementById('personalization-message');
+        const previewElement = document.getElementById('personalization-preview');
+        const limitElement = document.getElementById('preview-limit');
+        
+        if (!messageElement || !previewElement) return;
+
+        const message = messageElement.value.trim();
+        const limit = parseInt(limitElement?.value) || 3;
+
+        if (!message) {
+            previewElement.innerHTML = '<em class="text-muted">Enter a message to see preview</em>';
+            return;
+        }
+
+        if (this.selectedContacts.length === 0) {
+            previewElement.innerHTML = '<em class="text-muted">Select recipients to see personalized previews</em>';
+            return;
+        }
+
+        // Generate previews for limited number of contacts
+        const contactsToPreview = this.selectedContacts.slice(0, limit);
+        const previews = contactsToPreview.map(contact => {
+            const personalizedMessage = this.personalizeMessage(message, contact);
+            return `
+                <div class="border p-2 mb-2 bg-white rounded">
+                    <strong>${this.escapeHtml(contact.name)}</strong> 
+                    <small class="text-muted">(${this.escapeHtml(contact.phone)})</small>
+                    <div class="mt-1 text-dark">${this.escapeHtml(personalizedMessage)}</div>
+                </div>
+            `;
+        }).join('');
+
+        const totalCount = this.selectedContacts.length;
+        const moreText = totalCount > limit ? 
+            `<div class="text-center mt-2"><em class="text-muted">...and ${totalCount - limit} more recipients</em></div>` : '';
+
+        previewElement.innerHTML = `
+            <div class="mb-2"><strong>Preview for ${totalCount} recipient${totalCount !== 1 ? 's' : ''}:</strong></div>
+            ${previews}
+            ${moreText}
+        `;
+    }
+
     // Personalize message with contact data
     personalizeMessage(template, contact) {
         if (!template || !contact) return template;
