@@ -139,6 +139,173 @@ class PersonalizationManager {
         this.updatePersonalizationStats();
     }
 
+    // Handle recipient type change
+    onRecipientTypeChange() {
+        const recipientType = document.getElementById('personalization-recipient-type').value;
+        const recipientsSelect = document.getElementById('personalization-recipients');
+        const multipleContactsDiv = document.getElementById('personalization-multiple-contacts');
+        const contactSelectionDiv = document.getElementById('personalization-contact-selection');
+        const sendBtn = document.getElementById('send-personalized-btn');
+
+        this.currentRecipientType = recipientType;
+        this.selectedContacts = [];
+
+        // Hide all options first
+        if (recipientsSelect) recipientsSelect.style.display = 'none';
+        if (multipleContactsDiv) multipleContactsDiv.style.display = 'none';
+        if (contactSelectionDiv) contactSelectionDiv.style.display = 'none';
+        
+        if (sendBtn) sendBtn.disabled = true;
+
+        switch (recipientType) {
+            case 'single':
+                if (recipientsSelect) recipientsSelect.style.display = 'block';
+                this.loadSingleContactOptions();
+                break;
+            case 'multiple':
+                if (multipleContactsDiv) multipleContactsDiv.style.display = 'block';
+                if (contactSelectionDiv) contactSelectionDiv.style.display = 'block';
+                this.loadMultipleContactSelection();
+                break;
+            case 'group':
+                if (recipientsSelect) recipientsSelect.style.display = 'block';
+                this.loadGroupOptions();
+                break;
+            case 'all':
+                this.selectedContacts = this.app.contactManager?.contacts || [];
+                this.generatePersonalizedPreview();
+                if (sendBtn) sendBtn.disabled = false;
+                break;
+        }
+
+        this.updatePersonalizationStats();
+    }
+
+    // Load single contact options
+    loadSingleContactOptions() {
+        const select = document.getElementById('personalization-recipients');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Select a contact...</option>';
+        
+        if (this.app.contactManager && this.app.contactManager.contacts) {
+            this.app.contactManager.contacts.forEach(contact => {
+                const option = document.createElement('option');
+                option.value = contact.id;
+                option.textContent = `${contact.name} (${contact.phone})`;
+                select.appendChild(option);
+            });
+        }
+
+        select.onchange = () => {
+            const contactId = select.value;
+            if (contactId) {
+                const contact = this.app.contactManager.contacts.find(c => c.id === contactId);
+                this.selectedContacts = contact ? [contact] : [];
+            } else {
+                this.selectedContacts = [];
+            }
+            this.generatePersonalizedPreview();
+            const sendBtn = document.getElementById('send-personalized-btn');
+            if (sendBtn) sendBtn.disabled = this.selectedContacts.length === 0;
+            this.updatePersonalizationStats();
+        };
+    }
+
+    // Load group options
+    loadGroupOptions() {
+        const select = document.getElementById('personalization-recipients');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Select a group...</option>';
+        
+        if (this.app.contactManager && this.app.contactManager.groups) {
+            this.app.contactManager.groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = `${group.name} (${group.contactCount || 0} contacts)`;
+                select.appendChild(option);
+            });
+        }
+
+        select.onchange = async () => {
+            const groupId = select.value;
+            if (groupId) {
+                // Load group contacts (would need to implement in contact manager)
+                try {
+                    const response = await fetch(`/api/groups/${groupId}/contacts`);
+                    const result = await response.json();
+                    this.selectedContacts = result.success ? result.contacts : [];
+                } catch (error) {
+                    this.app.debugLog(`Error loading group contacts: ${error.message}`);
+                    this.selectedContacts = [];
+                }
+            } else {
+                this.selectedContacts = [];
+            }
+            this.generatePersonalizedPreview();
+            const sendBtn = document.getElementById('send-personalized-btn');
+            if (sendBtn) sendBtn.disabled = this.selectedContacts.length === 0;
+            this.updatePersonalizationStats();
+        };
+    }
+
+    // Load multiple contact selection
+    loadMultipleContactSelection() {
+        const container = document.getElementById('personalization-contact-list');
+        if (!container) return;
+
+        if (!this.app.contactManager || !this.app.contactManager.contacts) {
+            container.innerHTML = '<em class="text-muted">No contacts available</em>';
+            return;
+        }
+
+        container.innerHTML = this.app.contactManager.contacts.map(contact => `
+            <div class="contact-item" onclick="app.personalizationManager.toggleContactSelection('${contact.id}')">
+                <input type="checkbox" id="contact-${contact.id}" class="form-check-input me-2">
+                <strong>${this.escapeHtml(contact.name)}</strong>
+                <small class="text-muted">${this.escapeHtml(contact.phone)}</small>
+                ${contact.company ? `<br><small class="text-info">${this.escapeHtml(contact.company)}</small>` : ''}
+            </div>
+        `).join('');
+    }
+
+    // Toggle contact selection for multiple contacts
+    toggleContactSelection(contactId) {
+        const checkbox = document.getElementById(`contact-${contactId}`);
+        const contactItem = checkbox.parentElement;
+        
+        if (checkbox.checked) {
+            // Unselect
+            checkbox.checked = false;
+            contactItem.classList.remove('selected');
+            this.selectedContacts = this.selectedContacts.filter(c => c.id !== contactId);
+        } else {
+            // Select
+            checkbox.checked = true;
+            contactItem.classList.add('selected');
+            const contact = this.app.contactManager.contacts.find(c => c.id === contactId);
+            if (contact) {
+                this.selectedContacts.push(contact);
+            }
+        }
+
+        // Update counter
+        const counter = document.getElementById('selected-contacts-count');
+        if (counter) {
+            counter.textContent = this.selectedContacts.length;
+        }
+
+        // Update send button
+        const sendBtn = document.getElementById('send-personalized-btn');
+        if (sendBtn) {
+            sendBtn.disabled = this.selectedContacts.length === 0;
+        }
+
+        this.generatePersonalizedPreview();
+        this.updatePersonalizationStats();
+    }
+
     // Personalize message with contact data
     personalizeMessage(template, contact) {
         if (!template || !contact) return template;
